@@ -1,4 +1,4 @@
-package com.ucab.hexablock.hexablock
+package com.ucab.hexablock
 
 import io.flutter.embedding.android.FlutterActivity
 
