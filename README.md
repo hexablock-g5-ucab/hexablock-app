@@ -1,18 +1,18 @@
 # HexaBlock Suite
 
-![CI](https://github.com/nombre-real-de-tu-org/hexablock-app/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/hexablock-g5-ucab/hexablock-app/actions/workflows/ci.yml/badge.svg)
 ![Tests](https://img.shields.io/badge/tests-unit%20%7C%20integration%20%7C%20widget-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 Four hexagonal puzzle games — Hexa Lines, Hexa Fit, Hexa Sort and Hexa Merge — built on **one generic engine**.
-Flutter / Dart 3 client. Backend: [nombre-real-de-tu-org/hexablock-api](https://github.com/nombre-real-de-tu-org/hexablock-api).
+Flutter / Dart 3 client. Backend: [hexablock-g5-ucab/hexablock-api](https://github.com/hexablock-g5-ucab/hexablock-api).
 
 ## Demo
 _GIFs of the four variants (week 4)._
 
 ## Architecture
 Clean Architecture with each layer as a Dart package; the compiler enforces the dependency rule.
-![Clean Architecture](docs/diagrams/clean-architecture.png)
+<!-- TODO week 4: ![Clean Architecture](docs/diagrams/clean-architecture.png) -->
 
 | Package | Layer | Depends on |
 | --- | --- | --- |
@@ -37,19 +37,19 @@ Aspects are decorators of `UseCase<I, O>` composed in the composition root (no A
 
 ## Getting Started
 ```bash
-# Flutter stable with Dart >= 3.6 (pub workspaces)
-git clone https://github.com/nombre-real-de-tu-org/hexablock-app.git && cd hexablock-app
+# Flutter stable >= 3.47 (Dart >= 3.14, pub workspaces)
+git clone https://github.com/hexablock-g5-ucab/hexablock-app.git && cd hexablock-app
 npm install              # commitlint + git hooks (dev tooling only)
-dart pub get             # resolves the whole workspace
+flutter pub get          # resolves the whole workspace
 cd app && flutter run
 ```
 
 ## Running Tests
 ```bash
 dart format --output=none --set-exit-if-changed .
-    flutter analyze
-    (cd packages/hexa_engine && dart test)
-    (cd app && flutter test)
+flutter analyze
+(cd packages/hexa_engine && dart test)
+(cd app && flutter test)
 ```
 
 ## AI Usage Documentation

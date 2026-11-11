@@ -3,6 +3,8 @@ on:
   pull_request:
   push:
     branches: [main]
+permissions:
+  contents: read
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -16,7 +18,7 @@ jobs:
         with:
           channel: stable
           cache: true
-      - run: dart pub get
+      - run: flutter pub get
       - name: Format
         run: dart format --output=none --set-exit-if-changed .
       - name: Analyze

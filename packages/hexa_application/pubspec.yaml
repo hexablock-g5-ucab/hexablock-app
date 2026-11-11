@@ -3,7 +3,7 @@ description: "Layer 2 — generic use cases, ports and AOP decorators."
 publish_to: none
 resolution: workspace
 environment:
-  sdk: ^3.6.0
+  sdk: ^3.14.0
 dependencies:
   hexa_engine:
     path: ../hexa_engine
