@@ -23,9 +23,15 @@ jobs:
         run: dart format --output=none --set-exit-if-changed .
       - name: Analyze
         run: flutter analyze
-      - name: Engine tests
-        working-directory: packages/hexa_engine
-        run: dart test
+      - name: Package tests (every package that has a test/ folder)
+        run: |
+          for pkg in packages/*/; do
+            if [ -d "$pkg/test" ]; then
+              echo "::group::$pkg"
+              (cd "$pkg" && dart test)
+              echo "::endgroup::"
+            fi
+          done
       - name: Widget tests
         working-directory: app
         run: flutter test
