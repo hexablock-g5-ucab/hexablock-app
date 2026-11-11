@@ -1,0 +1,13 @@
+{
+  "name": "hexablock-app-tooling",
+  "private": true,
+  "description": "Dev tooling only (commit linting and git hooks). Not part of the product.",
+  "scripts": {
+    "prepare": "lefthook install"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "lefthook": "^1.7.0"
+  }
+}

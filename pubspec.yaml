@@ -1,0 +1,12 @@
+# Pub workspace root (Dart >= 3.6). `dart pub get` here resolves every package.
+name: hexablock_workspace
+publish_to: none
+environment:
+  sdk: ^3.6.0
+workspace:
+  - packages/hexa_engine
+  - packages/hexa_application
+  - packages/hexa_infrastructure
+  - app
+dev_dependencies:
+  lints: ^6.0.0

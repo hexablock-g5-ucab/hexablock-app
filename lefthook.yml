@@ -1,0 +1,17 @@
+# Local git hooks (CI enforces the same checks; hooks are a convenience).
+commit-msg:
+  commands:
+    commitlint:
+      run: npx --no -- commitlint --edit {1}
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: "*.dart"
+      run: dart format --set-exit-if-changed {staged_files}
+    analyze:
+      run: flutter analyze --no-pub
+pre-push:
+  commands:
+    tests:
+      run: cd packages/hexa_engine && dart test

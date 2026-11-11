@@ -1,0 +1,19 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+build/
+coverage/
+*.iml
+.idea/
+.vscode/*
+!.vscode/extensions.json
+**/android/.gradle/
+**/android/local.properties
+**/ios/Pods/
+**/ios/Flutter/Generated.xcconfig
+*.g.dart.tmp
+# Tooling
+node_modules/
+.env
+.env.*
+!.env.example

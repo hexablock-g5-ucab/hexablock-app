@@ -1,0 +1,10 @@
+name: hexa_engine
+description: "Layer 1 — entities: geometry, generic engine and the four variants. Pure Dart."
+publish_to: none
+resolution: workspace
+environment:
+  sdk: ^3.6.0
+dependencies:
+  meta: ^1.15.0
+dev_dependencies:
+  test: ^1.25.0

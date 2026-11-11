@@ -1,0 +1,4 @@
+# Every PR needs a review; engine changes need the engine owner.
+*                               @sebaimmortal098
+/packages/hexa_engine/lib/src/core/  @<engine-owner>
+/AGENTS.md                      @<engine-owner>
