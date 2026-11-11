@@ -1,0 +1,7 @@
+# Same line endings for everyone (Windows included); dart format expects LF.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.ico binary
+*.jar binary

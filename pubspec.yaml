@@ -1,8 +1,8 @@
-# Pub workspace root (Dart >= 3.6). `dart pub get` here resolves every package.
+# Pub workspace root (Dart >= 3.14, same constraint in every member). `dart pub get` here resolves every package.
 name: hexablock_workspace
 publish_to: none
 environment:
-  sdk: ^3.6.0
+  sdk: ^3.14.0
 workspace:
   - packages/hexa_engine
   - packages/hexa_application

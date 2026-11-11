@@ -10,7 +10,9 @@ void main() {
       'should_import_only_dart_core_and_meta_when_scanning_engine_sources',
       () {
         // Arrange
-        final forbidden = RegExp(r"import\s+'package:(?!hexa_engine/|meta/)");
+        final forbidden = RegExp(
+          r'''(import|export)\s+['"]package:(?!hexa_engine/|meta/)''',
+        );
         final sources = Directory('lib')
             .listSync(recursive: true)
             .whereType<File>()

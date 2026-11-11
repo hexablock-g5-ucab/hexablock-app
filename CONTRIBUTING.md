@@ -42,7 +42,7 @@ Examples:
 feat(engine): add generic HexBoard with axial coordinates
 test(sort): cover cascade tie-breaking by coordinate order
 fix(merge): merge each tile at most once per slide
-docs(readme): document bounded generics
+docs(repo): document bounded generics in the readme
 ```
 
 Breaking changes: add `!` after the scope (`feat(engine)!: ...`) and a `BREAKING CHANGE:` footer.

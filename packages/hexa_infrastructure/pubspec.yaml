@@ -3,7 +3,7 @@ description: "Layers 3-4 — adapters for persistence, network and audio."
 publish_to: none
 resolution: workspace
 environment:
-  sdk: ^3.6.0
+  sdk: ^3.14.0
 dependencies:
   hexa_application:
     path: ../hexa_application
