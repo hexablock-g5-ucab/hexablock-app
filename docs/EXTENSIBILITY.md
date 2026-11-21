@@ -1,18 +1,19 @@
-# Extensibility — adding a fifth variant
+# Adding a variant to the shared engine
 
-_To be completed with real class names as the engine is implemented. Skeleton:_
+The [v5 source views](diagrams/README.md) define the target contracts. Use Hexa Fill, a cell-painting puzzle, to rehearse the extension exercise. This is a design walkthrough for an additional game.
 
-1. Create `packages/hexa_engine/lib/src/variants/<name>/` with the cell type, move type, state and rules
-   (`extends AbstractGameRules<TCell, TMove, TState>`).
-2. Create `<Name>Factory implements GameVariantFactory<...>`.
-3. Create `<Name>Module implements GameModule` in `app/` and register it in the composition root.
-4. Add its use case(s) in `docs/specs/use-cases/` and tests in the engine package.
+1. Specify allowed paints, a rejected move, scoring, victory and how to persist progress. Make one small example board for each outcome.
+2. In `packages/hexa_engine/lib/src/variants/fill/` introduce FillCell, PaintCell and FillState. FillState implements `GameState<FillCell>`. Implement `AbstractGameRules<FillCell, PaintCell, FillState>` and a scoring policy.
+3. Bind the complete family in `GameVariantFactory<FillCell, PaintCell, FillState, PaintToken>`. Return `IPieceSource<PaintToken>` and pass that typed source to the rules. The other three games keep their own source types.
+4. Add a FillModule, a state serializer and the variant's input/render mapping at the app edge. Register the module once in the composition root. The selector discovers it through GameCatalog.
+5. Register a game ID in backend configuration if the variant syncs progress. For level-based play, add a spec validator, extend the level schema configuration in both repos and keep the same envelope and HTTP routes.
+6. Exercise one accepted move, one rejected move and a deterministic replay. Run the existing engine tests with a fake cell and verify that the shared engine, board, geometry, use cases and shared screen files have no variant-specific edits.
 
-**Files that must NOT change:** `core/`, `board/`, `geometry/`, generic use cases, shared screens.
-
-## Generic bounds and why
 | Bound | Reason |
 | --- | --- |
-| `TCell extends Object` | Empty cell = missing key; no null content |
-| `TState extends GameState<TCell>` | Engine and renderer read the board of any state |
-| `T extends Mergeable<T>` | Only same-type cells merge; `SlideMergeResolver` is reusable |
+| `TCell extends Object` | Absence in the board map means empty |
+| `TState extends GameState<TCell>` | Every session reads a board of the correct cell type |
+| `T extends Mergeable<T>` | Only the slide resolver requires same-type fusion |
+| `TPiece` on the factory | The produced piece and the input source of its rules must agree |
+
+A board-size change belongs in setup, a piece-shape change in the catalogue and a score change in the scoring policy. [Extension diagram](diagrams/extensibility.png)

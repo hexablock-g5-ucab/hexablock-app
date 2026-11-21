@@ -1,5 +1,5 @@
 name: hexa_engine
-description: "Layer 1 — entities: geometry, generic engine and the four variants. Pure Dart."
+description: "Layer 1 — entities: geometry, generic engine and the three assessed variants. Pure Dart."
 publish_to: none
 resolution: workspace
 environment:

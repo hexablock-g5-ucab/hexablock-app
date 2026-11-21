@@ -1,0 +1,52 @@
+---
+title: "HexaBlock · Modelo de clases v5 · Contratos del motor"
+---
+classDiagram
+  direction TB
+  class GameEngine["GameEngine〈TCell, TMove, TState〉"] {
+    +play(move) TurnResult
+  }
+  class GameState["GameState〈TCell〉"] {
+    <<interface>>
+    +board
+    +random
+  }
+  class HexBoard["HexBoard〈TCell〉"] {
+    +put(coord, cell) HexBoard
+  }
+  class IGameRules["IGameRules〈TCell, TMove, TState〉"] {
+    <<Strategy>>
+    +playTurn(state, move) TurnResult
+  }
+  class GameVariantFactory["GameVariantFactory〈TCell, TMove, TState, TPiece〉"] {
+    <<AbstractFactory>>
+    +createRules(setup, source) IGameRules
+  }
+  class IPieceSource["IPieceSource〈TPiece〉"] {
+    +next(rng) TPiece
+  }
+  class IScoringPolicy["IScoringPolicy〈TState〉"] {
+    +pointsFor(before, after, events) int
+  }
+  class AbstractGameRules {
+    <<TemplateMethod>>
+  }
+  class HexaLinesRules
+  class HexaSortRules
+  class HexaMergeRules
+  GameEngine --> GameState : estado actual
+  GameState --> HexBoard : tablero
+  GameEngine --> IGameRules : turno
+  GameEngine --> IScoringPolicy : puntaje
+  GameVariantFactory ..> IPieceSource : crea
+  GameVariantFactory ..> IGameRules : crea
+  GameVariantFactory ..> IScoringPolicy : crea
+  AbstractGameRules ..|> IGameRules
+  HexaLinesRules --|> AbstractGameRules
+  HexaSortRules --|> AbstractGameRules
+  HexaMergeRules --|> AbstractGameRules
+  style GameEngine fill:#FADBD8,stroke:#A94137
+  style IGameRules fill:#FFF1DC,stroke:#AF631A
+  style GameVariantFactory fill:#FFF1DC,stroke:#AF631A
+  style IScoringPolicy fill:#FFF1DC,stroke:#AF631A
+  style IPieceSource fill:#FFF1DC,stroke:#AF631A

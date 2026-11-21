@@ -1,0 +1,191 @@
+---
+title: "HexaBlock Suite · Modelo de clases v5 (2b/5) — Hexa Sort instancia el motor · hexa_engine/lib/src/variants/sort"
+config:
+  layout: elk
+  theme: base
+  themeVariables:
+    fontFamily: "Inter"
+    fontSize: "15px"
+  class:
+    hideEmptyMembersBox: true
+---
+classDiagram
+  direction LR
+
+  %% ===================== CONTRATOS DEL NÚCLEO (detalle en la vista 1) =====================
+  class AbstractGameRules~TCell, TMove, TState~ {
+    <<abstract · Template Method>>
+  }
+  class GameState~TCell extends Object~ {
+    <<interface>>
+  }
+  class IScoringPolicy~TState~ {
+    <<interface · Strategy>>
+  }
+  class IPieceSource~TPiece~ {
+    <<interface · Strategy>>
+  }
+  class SeededRandomPieceSource~TPiece~
+  class GameVariantFactory~TCell, TMove, TState, TPiece~ {
+    <<interface · Abstract Factory>>
+  }
+  class LevelProgress
+  class TileColor {
+    <<enumeration · paleta común del núcleo>>
+    red · blue · green · yellow · purple
+  }
+  class ILevelBuilder~TSetup~ {
+    <<interface · Builder>>
+    +build() TSetup
+  }
+  class HexagonShape {
+    <<forma del tablero>>
+  }
+  class GameEvent {
+    <<abstract · Observer>>
+  }
+
+  %% ===================== B · HEXA SORT (radio 2, pilas en cascada) =====================
+  class ColorStack {
+    <<TCell · inmutable>>
+    -chips: List~TileColor~ — abajo → arriba
+    +topColor: TileColor
+    +topRun: int
+    +takeTopRun() (ColorStack, List~TileColor~)
+    +push(chips: List~TileColor~) ColorStack
+  }
+  class PlaceStack {
+    <<TMove · inmutable>>
+    +trayIndex: int
+    +coord: HexCoord
+  }
+  class SortState {
+    <<TState · inmutable>>
+    +board: HexBoard~ColorStack~
+    +tray: List~ColorStack?~
+    +goalsDone: int
+    +goalsTarget: int
+  }
+  class HexaSortRules {
+    -cascade: CascadeTransferResolver
+    -stacks: IPieceSource~ColorStack~
+    #apply(...) SortState  (coloca la pila)
+    #resolve(...) SortState  (cascada)
+    +evaluate(s) GameOutcome  (metas / tablero lleno)
+  }
+  class CascadeTransferResolver {
+    <<Strategy>>
+    -direction: ITransferDirectionPolicy
+    -clearAt: int = 10
+    +resolve(b, placedAt) CascadeResult
+    -clearIfComplete(s: ColorStack) ColorStack? — elimina la pila completa
+  }
+  class ITransferDirectionPolicy {
+    <<interface · Strategy · punto de extensión>>
+    +onTie(a: HexCoord, b: HexCoord, placedAt: HexCoord) Transfer
+  }
+  class ExistingToPlacedPolicy {
+    <<regla actual del profesor>>
+    +onTie(...) Transfer — existente → nueva
+  }
+  class Transfer {
+    <<inmutable>>
+    +from: HexCoord
+    +to: HexCoord
+  }
+  class StackTransferred {
+    <<evento de la variante>>
+    +from: HexCoord
+    +to: HexCoord
+    +color: TileColor
+  }
+  class StackCompleted {
+    <<evento de la variante>>
+    +color: TileColor
+  }
+  class SortGoalScoring {
+    +pointsFor(before, after, events) int
+  }
+  class SortLevelBuilder {
+    <<Builder (concreto)>>
+    +withGoals(n: int) SortLevelBuilder
+    +withColors(c: List~TileColor~) SortLevelBuilder
+    +withSeed(seed: int) SortLevelBuilder
+    +build() GameSetup
+  }
+  class HexaSortFactory {
+    <<Abstract Factory (concreta)>>
+    +id = hexa-sort
+  }
+  ColorStack --> TileColor
+  SortState ..|> GameState : «bind» TCell→ColorStack
+  HexaSortRules --|> AbstractGameRules : «bind» ‹ColorStack, PlaceStack, SortState›
+  HexaSortRules *-- "1" CascadeTransferResolver
+  HexaSortRules --> "1" IPieceSource : stacks
+  CascadeTransferResolver --> "1" ITransferDirectionPolicy : direction
+  ExistingToPlacedPolicy ..|> ITransferDirectionPolicy
+  ITransferDirectionPolicy ..> Transfer : devuelve
+  StackTransferred --|> GameEvent
+  StackCompleted --|> GameEvent
+  CascadeTransferResolver ..> StackTransferred : emite
+  CascadeTransferResolver ..> StackCompleted : emite
+  SeededRandomPieceSource ..|> IPieceSource : «bind» TPiece→ColorStack
+  SortGoalScoring ..|> IScoringPolicy : «bind» TState→SortState
+  SortLevelBuilder ..|> ILevelBuilder : «bind» TSetup→GameSetup
+  HexaSortFactory ..|> GameVariantFactory : «bind» ‹ColorStack, PlaceStack, SortState, ColorStack›
+  HexaSortFactory ..> HexagonShape : «create» radio = setup.boardRadius
+  HexaSortFactory ..> SeededRandomPieceSource : «create»
+  HexaSortFactory ..> HexaSortRules : «create»
+  HexaSortFactory ..> SortGoalScoring : «create»
+  HexaSortFactory ..> LevelProgress : «create»
+  HexaSortFactory ..> ExistingToPlacedPolicy : «create» regla vigente
+  note for ITransferDirectionPolicy "Empate (misma cantidad en la cima y mismo color):<br>hoy la pila existente pasa a la recién colocada.<br>En cascadas sin pila nueva implicada,<br>usar orden axial estable para empates secundarios."
+  note for CascadeTransferResolver "Al llegar a 10 fichas del mismo color en la cima<br>se elimina la PILA COMPLETA (decisión del profesor),<br>se emite StackCompleted y la cascada continúa."
+
+  %% ===================== LEYENDA =====================
+  class LEG1["Capa 1 · Entidades — núcleo genérico (hexa_engine/core)"]
+  class LEG1b["Capa 1 · Entidades — variantes (hexa_engine/variants)"]
+  class LEG2["Capa 2 · Casos de uso (hexa_application)"]
+  class LEG3["Capa 3 · Adaptadores (hexa_infrastructure · app)"]
+  class LEG5["Borde naranja = punto de extensión del motor"]
+%% layer:domain LEG1
+%% layer:variant LEG1b
+%% layer:application LEG2
+%% layer:adapter LEG3
+%% layer:extension LEG5
+
+%% layer:extension AbstractGameRules GameState IScoringPolicy IPieceSource GameVariantFactory
+%% layer:domain SeededRandomPieceSource LevelProgress TileColor ILevelBuilder HexagonShape GameEvent
+%% layer:variant ColorStack PlaceStack SortState HexaSortRules CascadeTransferResolver ExistingToPlacedPolicy Transfer SortGoalScoring SortLevelBuilder HexaSortFactory StackTransferred StackCompleted
+%% layer:varext ITransferDirectionPolicy
+
+  %% ---- colores por capa ----
+  style LEG1 fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style LEG1b fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style LEG2 fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style LEG3 fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style LEG5 fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style AbstractGameRules fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style GameState fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IScoringPolicy fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IPieceSource fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style GameVariantFactory fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style SeededRandomPieceSource fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style LevelProgress fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style TileColor fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style ILevelBuilder fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style HexagonShape fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style GameEvent fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style ColorStack fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style PlaceStack fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style SortState fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style HexaSortRules fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style CascadeTransferResolver fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style ExistingToPlacedPolicy fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style Transfer fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style SortGoalScoring fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style SortLevelBuilder fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style HexaSortFactory fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style StackTransferred fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style StackCompleted fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style ITransferDirectionPolicy fill:#FEF5F4,stroke:#E67E22,stroke-width:4px,stroke-dasharray:5 3,color:#1B1B1B

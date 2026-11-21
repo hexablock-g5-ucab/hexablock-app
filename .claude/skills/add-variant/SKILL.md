@@ -1,6 +1,6 @@
 ---
 name: add-variant
-description: Guide for adding a new game variant without touching the engine (the defense exercise). Use when asked how to add a fifth variant or a new rule.
+description: Guide for adding a new game variant without touching the engine (the defense exercise). Use when asked how to add a new variant or a new rule.
 ---
 # add-variant
 

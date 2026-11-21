@@ -4,7 +4,7 @@ type: rules
 ---
 # Architecture Boundaries
 
-- **hexa_engine (Layer 1):** pure Dart. Geometry, `HexBoard<TCell>`, engine core, the four variants.
+- **hexa_engine (Layer 1):** pure Dart. Geometry, `HexBoard<TCell>`, engine core, the three variants.
   May import only `dart:*` and `package:meta`.
 - **hexa_application (Layer 2):** generic use cases, ports (`IProgressRepository`, `IApiGateway`,
   `IAudioPort`, `ILogger`), aspects as `UseCase<I, O>` decorators, session State pattern. Imports Layer 1 only.

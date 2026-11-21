@@ -1,0 +1,146 @@
+---
+title: "HexaBlock Suite · Modelo de clases v5 (2a/5) — Hexa Lines instancia el motor · hexa_engine/lib/src/variants/lines"
+config:
+  layout: elk
+  theme: base
+  themeVariables:
+    fontFamily: "Inter"
+    fontSize: "15px"
+  class:
+    hideEmptyMembersBox: true
+---
+classDiagram
+  direction LR
+
+  %% ===================== CONTRATOS DEL NÚCLEO (detalle en la vista 1) =====================
+  class AbstractGameRules~TCell, TMove, TState~ {
+    <<abstract · Template Method>>
+  }
+  class GameState~TCell extends Object~ {
+    <<interface>>
+  }
+  class IScoringPolicy~TState~ {
+    <<interface · Strategy>>
+  }
+  class IPieceSource~TPiece~ {
+    <<interface · Strategy>>
+  }
+  class SeededRandomPieceSource~TPiece~
+  class GameVariantFactory~TCell, TMove, TState, TPiece~ {
+    <<interface · Abstract Factory>>
+  }
+  class HighScoreProgress
+  class Piece~TCell extends Object~ {
+    <<Prototype>>
+  }
+  class TileColor {
+    <<enumeration · paleta común del núcleo>>
+    red · blue · green · yellow · purple
+  }
+  class HexagonShape {
+    <<forma del tablero>>
+  }
+  class GameEvent {
+    <<abstract · Observer>>
+  }
+
+  %% ===================== A · HEXA LINES (radio 4, sin fin) =====================
+  class PlacePiece {
+    <<TMove · inmutable>>
+    +trayIndex: int
+    +anchor: HexCoord
+  }
+  class LinesState {
+    <<TState · inmutable>>
+    +board: HexBoard~TileColor~
+    +tray: List~Piece‹TileColor›?~
+    +streak: int
+  }
+  class HexaLinesRules {
+    -clear: LineClearResolver
+    -pieces: IPieceSource~Piece‹TileColor›~
+    #apply(...) LinesState  (coloca la pieza)
+    #resolve(...) LinesState  (borra líneas llenas)
+    #afterResolve(...) LinesState  (rellena bandeja)
+    +evaluate(s) GameOutcome  (derrota si ninguna pieza cabe)
+  }
+  class LineClearResolver {
+    <<Strategy>>
+    +fullLines(b: HexBoard~TileColor~) List~Line~
+    +clear(b, lines) HexBoard~TileColor~
+  }
+  class LinesCleared {
+    <<evento de la variante>>
+    +count: int
+    +axes: Set~HexAxis~
+  }
+  class PolyhexCatalog {
+    <<datos>>
+    +pieces: List~Piece‹TileColor›~ — 1–5 celdas, con pesos
+  }
+  class LinesComboScoring {
+    +pointsFor(before, after, events) int
+  }
+  class HexaLinesFactory {
+    <<Abstract Factory (concreta)>>
+    +id = hexa-lines
+  }
+  LinesState ..|> GameState : «bind» TCell→TileColor
+  HexaLinesRules --|> AbstractGameRules : «bind» ‹TileColor, PlacePiece, LinesState›
+  HexaLinesRules *-- "1" LineClearResolver
+  HexaLinesRules --> "1" IPieceSource : pieces
+  SeededRandomPieceSource ..|> IPieceSource : «bind» TPiece→Piece‹TileColor›
+  HexaLinesFactory --> PolyhexCatalog : configura la fuente
+  LinesComboScoring ..|> IScoringPolicy : «bind» TState→LinesState
+  HexaLinesFactory ..|> GameVariantFactory : «bind» ‹TileColor, PlacePiece, LinesState, Piece‹TileColor››
+  HexaLinesFactory ..> HexagonShape : «create» radio = setup.boardRadius
+  HexaLinesFactory ..> SeededRandomPieceSource : «create»
+  HexaLinesFactory ..> HexaLinesRules : «create»
+  HexaLinesFactory ..> LinesComboScoring : «create»
+  HexaLinesFactory ..> HighScoreProgress : «create»
+  LinesState --> "0..3" Piece : tray
+  LinesCleared --|> GameEvent
+  LineClearResolver ..> LinesCleared : emite
+  note for HexaLinesRules "No implementa IUndoable (ISP): Lines<br>no tiene deshacer; sólo Merge lo tiene.<br>27 líneas = 9 por eje en radio 4."
+
+  %% ===================== LEYENDA =====================
+  class LEG1["Capa 1 · Entidades — núcleo genérico (hexa_engine/core)"]
+  class LEG1b["Capa 1 · Entidades — variantes (hexa_engine/variants)"]
+  class LEG2["Capa 2 · Casos de uso (hexa_application)"]
+  class LEG3["Capa 3 · Adaptadores (hexa_infrastructure · app)"]
+  class LEG5["Borde naranja = punto de extensión del motor"]
+%% layer:domain LEG1
+%% layer:variant LEG1b
+%% layer:application LEG2
+%% layer:adapter LEG3
+%% layer:extension LEG5
+
+%% layer:extension AbstractGameRules GameState IScoringPolicy IPieceSource GameVariantFactory
+%% layer:domain SeededRandomPieceSource HighScoreProgress Piece TileColor HexagonShape GameEvent
+%% layer:variant PlacePiece LinesState HexaLinesRules LineClearResolver PolyhexCatalog LinesComboScoring HexaLinesFactory LinesCleared
+
+  %% ---- colores por capa ----
+  style LEG1 fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style LEG1b fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style LEG2 fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style LEG3 fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style LEG5 fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style AbstractGameRules fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style GameState fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IScoringPolicy fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IPieceSource fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style GameVariantFactory fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style SeededRandomPieceSource fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style HighScoreProgress fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style Piece fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style TileColor fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style HexagonShape fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style GameEvent fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style PlacePiece fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style LinesState fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style HexaLinesRules fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style LineClearResolver fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style PolyhexCatalog fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style LinesComboScoring fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style HexaLinesFactory fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style LinesCleared fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B

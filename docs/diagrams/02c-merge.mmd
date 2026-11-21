@@ -1,0 +1,151 @@
+---
+title: "HexaBlock Suite · Modelo de clases v5 (2c/5) — Hexa Merge instancia el motor · hexa_engine/lib/src/variants/merge"
+config:
+  layout: elk
+  theme: base
+  themeVariables:
+    fontFamily: "Inter"
+    fontSize: "15px"
+  class:
+    hideEmptyMembersBox: true
+---
+classDiagram
+  direction LR
+
+  %% ===================== CONTRATOS DEL NÚCLEO (detalle en la vista 1) =====================
+  class AbstractGameRules~TCell, TMove, TState~ {
+    <<abstract · Template Method>>
+  }
+  class GameState~TCell extends Object~ {
+    <<interface>>
+  }
+  class IScoringPolicy~TState~ {
+    <<interface · Strategy>>
+  }
+  class IPieceSource~TPiece~ {
+    <<interface · Strategy>>
+  }
+  class GameVariantFactory~TCell, TMove, TState, TPiece~ {
+    <<interface · Abstract Factory>>
+  }
+  class HighScoreProgress
+  class UndoableGameEngine~TCell, TMove, TState~ {
+    <<Command · IUndoable>>
+  }
+  class IRandom {
+    <<interface · DIP>>
+  }
+  class Mergeable~T extends Mergeable‹T›~ {
+    <<interface · cota F>>
+  }
+  class SlideMergeResolver~T extends Mergeable‹T›~ {
+    <<Strategy reutilizable>>
+  }
+  class HexagonShape {
+    <<forma del tablero>>
+  }
+  class GameEvent {
+    <<abstract · Observer>>
+  }
+
+  %% ===================== C · HEXA MERGE (radio 2, 2048 en 6 direcciones) =====================
+  class MergeTile {
+    <<TCell · inmutable>>
+    +value: int — potencia de 2
+    +canMergeWith(o: MergeTile) bool
+    +mergeWith(o: MergeTile) MergeTile
+  }
+  class Slide {
+    <<TMove · inmutable>>
+    +direction: HexDirection
+  }
+  class MergeState {
+    <<TState · inmutable>>
+    +board: HexBoard~MergeTile~
+    +random: IRandom — heredado de GameState
+    +target: int — p. ej. 2048
+  }
+  class HexaMergeRules {
+    -slider: SlideMergeResolver~MergeTile~
+    -spawner: IPieceSource~MergeTile~
+    #apply(...) MergeState  (deslizar + fusionar)
+    #resolve(...) MergeState  (no-op: la fusión ocurre al deslizar)
+    #afterResolve(...) MergeState  (genera 2 o 4)
+    +evaluate(s) GameOutcome  (objetivo / sin movimientos)
+  }
+  class TileSpawner {
+    -pFour: double = 0.1
+    +next(rng: IRandom) MergeTile
+  }
+  class TilesMerged {
+    <<evento de la variante>>
+    +value: int
+  }
+  class MergeSumScoring {
+    +pointsFor(before, after, events) int  (suma de fusiones)
+  }
+  class HexaMergeFactory {
+    <<Abstract Factory (concreta)>>
+    +id = hexa-merge
+  }
+  MergeTile ..|> Mergeable : «bind» T→MergeTile
+  MergeState ..|> GameState : «bind» TCell→MergeTile
+  HexaMergeRules --|> AbstractGameRules : «bind» ‹MergeTile, Slide, MergeState›
+  HexaMergeRules *-- "1" SlideMergeResolver : «bind» T→MergeTile
+  HexaMergeRules --> "1" IPieceSource : spawner
+  TileSpawner ..|> IPieceSource : «bind» TPiece→MergeTile
+  TileSpawner ..> IRandom : usa el del estado
+  TilesMerged --|> GameEvent
+  HexaMergeRules ..> TilesMerged : emite (con el SlideResult)
+  MergeSumScoring ..|> IScoringPolicy : «bind» TState→MergeState
+  HexaMergeFactory ..|> GameVariantFactory : «bind» ‹MergeTile, Slide, MergeState, MergeTile›
+  HexaMergeFactory ..> HexagonShape : «create» radio = setup.boardRadius
+  HexaMergeFactory ..> TileSpawner : «create»
+  HexaMergeFactory ..> HexaMergeRules : «create»
+  HexaMergeFactory ..> MergeSumScoring : «create»
+  HexaMergeFactory ..> HighScoreProgress : «create»
+  note for UndoableGameEngine "HexaMergeModule compone el motor con las reglas<br>y la puntuación que produce HexaMergeFactory."
+  note for MergeState "El estado del IRandom viaja en la instantánea:<br>deshacer y repetir el deslizamiento genera<br>la misma ficha (no se puede «pescar» un 4)."
+
+  %% ===================== LEYENDA =====================
+  class LEG1["Capa 1 · Entidades — núcleo genérico (hexa_engine/core)"]
+  class LEG1b["Capa 1 · Entidades — variantes (hexa_engine/variants)"]
+  class LEG2["Capa 2 · Casos de uso (hexa_application)"]
+  class LEG3["Capa 3 · Adaptadores (hexa_infrastructure · app)"]
+  class LEG5["Borde naranja = punto de extensión del motor"]
+%% layer:domain LEG1
+%% layer:variant LEG1b
+%% layer:application LEG2
+%% layer:adapter LEG3
+%% layer:extension LEG5
+
+%% layer:extension AbstractGameRules GameState IScoringPolicy IPieceSource GameVariantFactory
+%% layer:domain HighScoreProgress UndoableGameEngine IRandom Mergeable SlideMergeResolver HexagonShape GameEvent
+%% layer:variant MergeTile Slide MergeState HexaMergeRules TileSpawner MergeSumScoring HexaMergeFactory TilesMerged
+
+  %% ---- colores por capa ----
+  style LEG1 fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style LEG1b fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style LEG2 fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style LEG3 fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style LEG5 fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style AbstractGameRules fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style GameState fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IScoringPolicy fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IPieceSource fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style GameVariantFactory fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style HighScoreProgress fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style UndoableGameEngine fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style IRandom fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style Mergeable fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style SlideMergeResolver fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style HexagonShape fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style GameEvent fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style MergeTile fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style Slide fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style MergeState fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style HexaMergeRules fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style TileSpawner fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style MergeSumScoring fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style HexaMergeFactory fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style TilesMerged fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
