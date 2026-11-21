@@ -1,30 +1,23 @@
-# AGENTS.md — HexaBlock Suite client
+# Working on the HexaBlock mobile client
 
-Rules for every AI agent and every human in this repository. Keep this file short; add a rule each
-time an agent does something it must never repeat.
+## Start here
 
-## Product
-Four hexagonal puzzle variants on ONE generic engine. The jury will ask us to add a fifth variant live.
+Read the [assessed scope](docs/specs/requirements.md), the relevant use case under `docs/specs/use-cases/` and the [v5 class model](docs/diagrams/README.md). The team confirmed the professor removed Hexa Fit. Deliver Lines, Sort and Merge. Treat the model as the design baseline and the implementation and tests as evidence of current behaviour.
 
-## Architecture (non-negotiable)
-- Packages: `hexa_engine` (pure Dart) ← `hexa_application` ← `hexa_infrastructure` ← `app`.
-- `hexa_engine` never imports Flutter, drift, dio or any other package of ours.
-- No `if`/`switch` on the game variant inside the engine or the generic use cases.
-  Variability goes through Strategy (`IGameRules`, `IScoringPolicy`, `IPieceSource`) and Abstract Factory.
-- State is immutable: boards are copied, never mutated. Randomness only through `IRandom`.
-- Every generic bound must be justified in `docs/EXTENSIBILITY.md`.
+## Architecture
 
-## Process
-- Behaviour changes start in `docs/specs/use-cases/UC-xxx.md`. Do not implement Draft use cases.
-- Follow `harness/README.md` for every phase. Wait for approval before writing code.
-- Tests: AAA, `should_<result>_when_<condition>`, grouped by UC id, fixed seeds, fakes for ports.
-- Never add a dependency without approval. Never commit, push or touch remotes.
-- When done: list files changed and the FR/UC ids covered; draft the AI log entry.
+- Keep geometry, board, turn sequencing and variant rules in pure Dart in `hexa_engine`. Keep Flutter, SQLite and HTTP in outer layers.
+- Preserve `TCell`, `TMove` and `TState` through the engine and `TPiece` through the factory. Register variants at composition time. Supply a cell renderer and input mapping per module.
+- Copy board and RNG state on accepted turns. A rejected move preserves board, score, history and RNG. One Merge undo restores the accepted snapshot. Use fixed seeds and prove replay reproduces the tile and its coordinate.
+- For Sort, implement the confirmed top-run and tie rules in the model. Share the level envelope with the API and validate downloaded levels before play.
 
-## Commands
-```bash
-dart format --output=none --set-exit-if-changed .
-flutter analyze
-(cd packages/hexa_engine && dart test)
-(cd app && flutter test)
-```
+## Working agreement
+
+1. Start behaviour changes from an approved use case. Name the acceptance checks and unresolved decisions. Use the existing [phase workflow](harness/README.md) for implementation approval.
+2. Keep a PR to one outcome. Ask before adding dependencies or changing a shared contract. Humans own the architectural decisions, review, commits and pushes unless explicitly delegated.
+3. Use Arrange–Act–Assert and `should_<result>_when_<condition>`. The reviewer checks one main flow, a boundary case and the relevant architecture constraint. Record actual results and anything untested.
+4. Update the README and editable diagrams if the design changes. For significant AI use, add a task entry and index it in [AI_USAGE.md](AI_USAGE.md). Link the PR, distinguish generated work from human changes, and use only the model identifier actually reported by the tool.
+
+## Verification
+
+From the workspace root run `dart format --output=none --set-exit-if-changed .` and `flutter analyze`. Run `dart test` inside each package with tests and `flutter test` from `app/`. For UI, audio and networking, record a device or emulator observation. For a documentation-only change, check local links, render edited Mermaid files and compare every image with its source.

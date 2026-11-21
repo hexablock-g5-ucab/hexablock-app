@@ -1,0 +1,271 @@
+---
+title: "HexaBlock Suite · Modelo de clases v5 (4/5) — Adaptadores, módulos por variante y presentación · hexa_infrastructure + app"
+config:
+  layout: elk
+  theme: base
+  themeVariables:
+    fontFamily: "Inter"
+    fontSize: "15px"
+  class:
+    hideEmptyMembersBox: true
+---
+classDiagram
+  direction LR
+
+  %% ===================== PUERTOS (capa 2, ver vista 3) =====================
+  class IProgressRepository {
+    <<interface · puerto>>
+  }
+  class ISavedGameStore {
+    <<interface · puerto>>
+  }
+  class ILevelSource {
+    <<interface · puerto>>
+  }
+  class IProgressGateway {
+    <<interface · puerto>>
+  }
+  class ILeaderboardGateway {
+    <<interface · puerto>>
+  }
+  class IAuthGateway {
+    <<interface · puerto>>
+  }
+  class ISessionStore {
+    <<interface · puerto>>
+  }
+  class IStateSerializer~TState~ {
+    <<interface · puerto · Mapper>>
+  }
+  class ISeedProvider {
+    <<interface · puerto>>
+  }
+  class ILogger {
+    <<interface · puerto>>
+  }
+  class GameModule {
+    <<interface · borde no genérico>>
+  }
+  class GameCatalog {
+    <<registro · OCP>>
+  }
+  class UseCase~I, O~ {
+    <<interface>>
+  }
+  class GameEvent {
+    <<abstract · Observer>>
+  }
+  class ILevelBuilder~TSetup~ {
+    <<interface · Builder>>
+  }
+
+  %% ===================== hexa_infrastructure · ADAPTADORES =====================
+  class DriftProgressRepository {
+    <<Adapter · drift/SQLite>>
+    -db: AppDatabase
+  }
+  class DriftSavedGameStore {
+    <<Adapter · drift/SQLite>>
+    -db: AppDatabase
+  }
+  class AppDatabase {
+    <<drift>>
+    game_progress · level_progress · saved_games
+  }
+  class AssetLevelSource {
+    <<Adapter · assets JSON>>
+    -director: LevelJsonDirector
+  }
+  class RemoteLevelSource {
+    <<Adapter · GET /games/:gameId/levels>>
+    +levels(game: String) Future~List‹GameSetup›~
+  }
+  class FallbackLevelSource {
+    <<Adapter · catálogo de niveles>>
+    +levels(game: String) Future~List‹GameSetup›~
+  }
+  class LevelJsonDirector {
+    <<Builder (director)>>
+    +build(json: Map, b: ILevelBuilder) GameSetup
+  }
+  class DioApiGateway {
+    <<Adapter · dio + JWT>>
+    -dio: Dio
+    -session: ISessionStore
+    +sync(p) Future~Progress~
+    +submit(s) Future~void~
+    +top(q) Future~Leaderboard~
+    +login(...) Future~Session~
+  }
+  class ProblemJsonMapper {
+    +toFailure(DioException) ApiFailure
+  }
+  class LocalSessionStore {
+    <<Adapter · Singleton (alcance único DI)>>
+  }
+  class SecureSeedProvider
+  class DebugLogger
+
+  %% ===================== app · UN MÓDULO POR VARIANTE =====================
+  class HexaLinesModule {
+    -factory: HexaLinesFactory
+    -serializer: LinesStateSerializer
+  }
+  class HexaSortModule {
+    -factory: HexaSortFactory
+    -serializer: SortStateSerializer
+  }
+  class HexaMergeModule {
+    -factory: HexaMergeFactory
+    -serializer: MergeStateSerializer
+  }
+  class LinesStateSerializer
+  class SortStateSerializer
+  class MergeStateSerializer
+
+  %% ===================== app · PRESENTACIÓN =====================
+  class GameViewModel {
+    <<Presenter · observa GameEvent>>
+    -facade: GameServiceFacade
+    +state: UiState
+    +board: List~CellVM~ — lo que dibuja la vista
+    +onDrop(trayIndex, c: HexCoord) void
+    +onTap(c: HexCoord) void
+    +onSwipe(d: HexDirection) void
+    +onUndo() void
+    +onAnimationsDone() void  (→ session.finishResolving)
+  }
+  class GameServiceFacade {
+    <<Facade>>
+    -start: UseCase
+    -move: UseCase
+    -undo: UseCase
+    -save: UseCase
+    +start(game, setup) Future
+    +move(m) Future
+    +undo() Future
+    +finish(result) Future
+  }
+  class AudioManager {
+    <<Singleton (alcance único DI) · Observer · Adapter>>
+    -sounds: Map~Type, String~ — cada módulo registra los de su variante
+    +onEvent(e: GameEvent) void  (sonido por defecto si no lo conoce)
+    +setMuted(m: bool) void
+  }
+  class AppProviders {
+    <<Composition Root · Riverpod>>
+    +catalog: Provider~GameCatalog~
+    +useCases: Provider~...~ — envueltos con aspectos
+  }
+
+  %% ===================== RELACIONES =====================
+  DriftProgressRepository ..|> IProgressRepository
+  DriftSavedGameStore ..|> ISavedGameStore
+  DriftProgressRepository --> AppDatabase
+  DriftSavedGameStore --> AppDatabase
+  RemoteLevelSource ..|> ILevelSource
+  RemoteLevelSource --> LevelJsonDirector : valida y construye
+  FallbackLevelSource ..|> ILevelSource
+  FallbackLevelSource --> RemoteLevelSource : fuente preferida
+  FallbackLevelSource --> AssetLevelSource : catálogo incluido sin red
+  AppProviders ..> FallbackLevelSource : inyecta en LoadLevelsUseCase
+  AssetLevelSource ..|> ILevelSource
+  AssetLevelSource --> LevelJsonDirector
+  LevelJsonDirector ..> ILevelBuilder : dirige
+  DioApiGateway ..|> IProgressGateway
+  DioApiGateway ..|> ILeaderboardGateway
+  DioApiGateway ..|> IAuthGateway
+  DioApiGateway --> ISessionStore : token JWT
+  DioApiGateway --> ProblemJsonMapper
+  LocalSessionStore ..|> ISessionStore
+  SecureSeedProvider ..|> ISeedProvider
+  DebugLogger ..|> ILogger
+
+  HexaLinesModule ..|> GameModule
+  HexaSortModule ..|> GameModule
+  HexaMergeModule ..|> GameModule
+  HexaLinesModule --> LinesStateSerializer
+  HexaSortModule --> SortStateSerializer
+  HexaMergeModule --> MergeStateSerializer
+  LinesStateSerializer ..|> IStateSerializer : «bind» TState→LinesState
+  SortStateSerializer ..|> IStateSerializer : «bind» TState→SortState
+  MergeStateSerializer ..|> IStateSerializer : «bind» TState→MergeState
+  GameViewModel --> "1" GameServiceFacade : facade
+  GameViewModel ..> GameEvent : escucha
+  GameServiceFacade --> UseCase : usa (decorados)
+  AudioManager ..> GameEvent : escucha
+  GameServiceFacade --> AudioManager : silenciar / volumen
+
+  AppProviders ..> GameCatalog : registra 3 módulos
+  AppProviders ..> UseCase : envuelve con aspectos
+  AppProviders ..> DioApiGateway : «create»
+  AppProviders ..> DriftProgressRepository : «create»
+
+  note for DioApiGateway "Un adaptador, tres puertos (ISP del lado<br>del puerto). Los errores RFC 9457 de la API<br>se traducen a ApiFailure en un solo lugar."
+  note for AppProviders "Único lugar que conoce las clases concretas.<br>Agregar Hexa Fill = 1 módulo nuevo +<br>1 línea aquí."
+  note for HexaMergeModule "Cada módulo trae además su widget de celda;<br>se omite por ser UI de bajo nivel (enunciado 4.1).<br>El de Merge crea su partida con UndoableGameEngine."
+
+  %% ===================== LEYENDA =====================
+  class LEG1["Capa 1 · Entidades — núcleo genérico (hexa_engine/core)"]
+  class LEG1b["Capa 1 · Entidades — variantes (hexa_engine/variants)"]
+  class LEG2["Capa 2 · Casos de uso (hexa_application)"]
+  class LEG3["Capa 3 · Adaptadores (hexa_infrastructure · app)"]
+  class LEG5["Borde naranja = punto de extensión del motor"]
+%% layer:domain LEG1
+%% layer:variant LEG1b
+%% layer:application LEG2
+%% layer:adapter LEG3
+%% layer:extension LEG5
+
+%% layer:application IProgressRepository ISavedGameStore ILevelSource IProgressGateway ILeaderboardGateway IAuthGateway ISessionStore ISeedProvider ILogger GameCatalog UseCase
+%% layer:extapp GameModule IStateSerializer
+%% layer:domain GameEvent ILevelBuilder
+%% layer:adapter DriftProgressRepository DriftSavedGameStore AppDatabase AssetLevelSource LevelJsonDirector DioApiGateway ProblemJsonMapper LocalSessionStore SecureSeedProvider DebugLogger HexaLinesModule HexaSortModule HexaMergeModule LinesStateSerializer SortStateSerializer MergeStateSerializer GameViewModel GameServiceFacade AudioManager AppProviders
+
+  %% ---- colores por capa ----
+  style LEG1 fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style LEG1b fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style LEG2 fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style LEG3 fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style LEG5 fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IProgressRepository fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ISavedGameStore fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ILevelSource fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style IProgressGateway fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ILeaderboardGateway fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style IAuthGateway fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ISessionStore fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ISeedProvider fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ILogger fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style GameCatalog fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style UseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style GameModule fill:#FCF3CF,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IStateSerializer fill:#FCF3CF,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style GameEvent fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style ILevelBuilder fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style DriftProgressRepository fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style DriftSavedGameStore fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style AppDatabase fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style AssetLevelSource fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style LevelJsonDirector fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style DioApiGateway fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style ProblemJsonMapper fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style LocalSessionStore fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style SecureSeedProvider fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style DebugLogger fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style HexaLinesModule fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style HexaSortModule fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style HexaMergeModule fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style LinesStateSerializer fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style SortStateSerializer fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style MergeStateSerializer fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style GameViewModel fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style GameServiceFacade fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style AudioManager fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style AppProviders fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+
+%% layer:adapter RemoteLevelSource
+  style RemoteLevelSource fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+
+%% layer:adapter FallbackLevelSource
+  style FallbackLevelSource fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B

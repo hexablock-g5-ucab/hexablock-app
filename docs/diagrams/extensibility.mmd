@@ -1,0 +1,10 @@
+flowchart TB
+  L["Lines · TileColor / PlacePiece"] --> A
+  S["Sort · ColorStack / PlaceStack"] --> A
+  M["Merge · MergeTile / Slide"] --> A
+  X["New variant · cell / move / state"] -.-> A
+  A["GameVariantFactory · rules, typed source, scoring and progress"] --> E["Shared GameEngine · board, turns and events"]
+  X -.-> G["Register a GameModule · input, renderer, serializer"]
+  G --> C["GameCatalog · shared selector and session"]
+  style E fill:#f9e6df,stroke:#8e5144
+  style X fill:#e2f3ea,stroke:#36724f
