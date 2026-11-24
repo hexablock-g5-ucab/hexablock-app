@@ -1,5 +1,5 @@
 ---
-title: "HexaBlock Suite · Modelo de clases v5 (2b/5) — Hexa Sort instancia el motor · hexa_engine/lib/src/variants/sort"
+title: "HexaBlock Suite · Modelo de clases v6.3 (2b/5) — Hexa Sort instancia el motor · hexa_engine/lib/src/variants/sort"
 config:
   layout: elk
   theme: base
@@ -30,6 +30,9 @@ classDiagram
     <<interface · Abstract Factory>>
   }
   class LevelProgress
+  class HexDirection {
+    <<enumeration>>
+  }
   class TileColor {
     <<enumeration · paleta común del núcleo>>
     red · blue · green · yellow · purple
@@ -58,26 +61,49 @@ classDiagram
     <<TMove · inmutable>>
     +trayIndex: int
     +coord: HexCoord
+    +at: Duration — tiempo de partida; lo pone la app con un reloj inyectado
   }
   class SortState {
     <<TState · inmutable>>
     +board: HexBoard~ColorStack~
-    +tray: List~ColorStack?~
-    +goalsDone: int
-    +goalsTarget: int
+    +tray: List~ColorStack?~ — 3 pilas; se repone al usarlas todas
+    +goal: ILevelGoal
+    +cleared: Map‹TileColor, int› — fichas eliminadas por color
+    +points: int — 10 por ficha eliminada + racha
+    +elapsed: Duration
+    +lastClearAt: Duration?
+  }
+  class ILevelGoal {
+    <<interface · Strategy · punto de extensión>>
+    +isMet(s: SortState) bool
+    +progress(s: SortState) double
+  }
+  class ScoreGoal {
+    <<meta de niveles iniciales>>
+    +target: int
+  }
+  class ColorsClearedGoal {
+    <<meta de niveles avanzados>>
+    +required: Map‹TileColor, int›
+  }
+  class TimeTiers {
+    <<inmutable · bonificación por tiempo>>
+    +bonus(elapsed: Duration) int — ≤1 min 100 · ≤2,5 min 50 · ≤5 min 10 · si no 0
   }
   class HexaSortRules {
     -cascade: CascadeTransferResolver
     -stacks: IPieceSource~ColorStack~
     #apply(...) SortState  (coloca la pila)
     #resolve(...) SortState  (cascada)
-    +evaluate(s) GameOutcome  (metas / tablero lleno)
+    +evaluate(s) GameOutcome  (goal.isMet / sin celdas libres)
   }
   class CascadeTransferResolver {
     <<Strategy>>
     -direction: ITransferDirectionPolicy
     -clearAt: int = 10
+    -order: List~HexDirection~ — sentido horario, empieza en northEast
     +resolve(b, placedAt) CascadeResult
+    -amount(from, to) int — min(racha, 10 − racha destino)
     -clearIfComplete(s: ColorStack) ColorStack? — elimina la pila completa
   }
   class ITransferDirectionPolicy {
@@ -85,7 +111,7 @@ classDiagram
     +onTie(a: HexCoord, b: HexCoord, placedAt: HexCoord) Transfer
   }
   class ExistingToPlacedPolicy {
-    <<regla actual del profesor>>
+    <<regla del equipo>>
     +onTie(...) Transfer — existente → nueva
   }
   class Transfer {
@@ -104,11 +130,12 @@ classDiagram
     +color: TileColor
   }
   class SortGoalScoring {
-    +pointsFor(before, after, events) int
+    -tiers: TimeTiers
+    +pointsFor(before, after, events) int — Δpoints + bonus por tiempo al ganar
   }
   class SortLevelBuilder {
     <<Builder (concreto)>>
-    +withGoals(n: int) SortLevelBuilder
+    +withGoal(g: ILevelGoal) SortLevelBuilder
     +withColors(c: List~TileColor~) SortLevelBuilder
     +withSeed(seed: int) SortLevelBuilder
     +build() GameSetup
@@ -125,6 +152,11 @@ classDiagram
   CascadeTransferResolver --> "1" ITransferDirectionPolicy : direction
   ExistingToPlacedPolicy ..|> ITransferDirectionPolicy
   ITransferDirectionPolicy ..> Transfer : devuelve
+  SortState --> "1" ILevelGoal : goal
+  ScoreGoal ..|> ILevelGoal
+  ColorsClearedGoal ..|> ILevelGoal
+  SortGoalScoring --> "1" TimeTiers
+  SortLevelBuilder ..> ILevelGoal : withGoal
   StackTransferred --|> GameEvent
   StackCompleted --|> GameEvent
   CascadeTransferResolver ..> StackTransferred : emite
@@ -139,8 +171,10 @@ classDiagram
   HexaSortFactory ..> SortGoalScoring : «create»
   HexaSortFactory ..> LevelProgress : «create»
   HexaSortFactory ..> ExistingToPlacedPolicy : «create» regla vigente
-  note for ITransferDirectionPolicy "Empate (misma cantidad en la cima y mismo color):<br>hoy la pila existente pasa a la recién colocada.<br>En cascadas sin pila nueva implicada,<br>usar orden axial estable para empates secundarios."
-  note for CascadeTransferResolver "Al llegar a 10 fichas del mismo color en la cima<br>se elimina la PILA COMPLETA (decisión del profesor),<br>se emite StackCompleted y la cascada continúa."
+  note for ITransferDirectionPolicy "Regla general: pasa de la pila con menos fichas de ese<br>color a la que tiene más. Empate: la existente pasa a la<br>recién colocada (regla del equipo). Si ninguna es nueva,<br>decide el orden horario de CascadeTransferResolver."
+  note for CascadeTransferResolver "Solo pasan las fichas que faltan para llegar a 10; el<br>sobrante se queda en la pila de origen. Con 10 se elimina<br>la PILA COMPLETA (acordado con el profesor), sus fichas<br>cuentan en cleared por color, se emite StackCompleted<br>y se revisan otra vez los vecinos en orden horario."
+  note for PlaceStack "El tiempo entra como dato del movimiento:<br>el motor no lee el reloj y las pruebas<br>siguen siendo deterministas."
+  note for ILevelGoal "Cada nivel trae UNA meta en su JSON:<br>puntos (niveles iniciales) o fichas por<br>color (niveles avanzados)."
 
   %% ===================== LEYENDA =====================
   class LEG1["Capa 1 · Entidades — núcleo genérico (hexa_engine/core)"]
@@ -155,9 +189,9 @@ classDiagram
 %% layer:extension LEG5
 
 %% layer:extension AbstractGameRules GameState IScoringPolicy IPieceSource GameVariantFactory
-%% layer:domain SeededRandomPieceSource LevelProgress TileColor ILevelBuilder HexagonShape GameEvent
-%% layer:variant ColorStack PlaceStack SortState HexaSortRules CascadeTransferResolver ExistingToPlacedPolicy Transfer SortGoalScoring SortLevelBuilder HexaSortFactory StackTransferred StackCompleted
-%% layer:varext ITransferDirectionPolicy
+%% layer:domain SeededRandomPieceSource LevelProgress TileColor ILevelBuilder HexagonShape GameEvent HexDirection
+%% layer:variant ColorStack PlaceStack SortState HexaSortRules CascadeTransferResolver ExistingToPlacedPolicy Transfer SortGoalScoring SortLevelBuilder HexaSortFactory StackTransferred StackCompleted ScoreGoal ColorsClearedGoal TimeTiers
+%% layer:varext ITransferDirectionPolicy ILevelGoal
 
   %% ---- colores por capa ----
   style LEG1 fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
@@ -176,6 +210,7 @@ classDiagram
   style ILevelBuilder fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
   style HexagonShape fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
   style GameEvent fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style HexDirection fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
   style ColorStack fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
   style PlaceStack fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
   style SortState fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
@@ -188,4 +223,8 @@ classDiagram
   style HexaSortFactory fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
   style StackTransferred fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
   style StackCompleted fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style ScoreGoal fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style ColorsClearedGoal fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style TimeTiers fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
   style ITransferDirectionPolicy fill:#FEF5F4,stroke:#E67E22,stroke-width:4px,stroke-dasharray:5 3,color:#1B1B1B
+  style ILevelGoal fill:#FEF5F4,stroke:#E67E22,stroke-width:4px,stroke-dasharray:5 3,color:#1B1B1B

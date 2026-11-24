@@ -1,5 +1,5 @@
 ---
-title: "HexaBlock Suite · Modelo de clases v5 (4/5) — Adaptadores, módulos por variante y presentación · hexa_infrastructure + app"
+title: "HexaBlock Suite · Modelo de clases v6.3 (4/5) — Adaptadores, módulos por variante y presentación · hexa_infrastructure + app"
 config:
   layout: elk
   theme: base
@@ -14,9 +14,6 @@ classDiagram
 
   %% ===================== PUERTOS (capa 2, ver vista 3) =====================
   class IProgressRepository {
-    <<interface · puerto>>
-  }
-  class ISavedGameStore {
     <<interface · puerto>>
   }
   class ILevelSource {
@@ -34,13 +31,16 @@ classDiagram
   class ISessionStore {
     <<interface · puerto>>
   }
-  class IStateSerializer~TState~ {
-    <<interface · puerto · Mapper>>
+  class IClock {
+    <<interface · puerto>>
   }
   class ISeedProvider {
     <<interface · puerto>>
   }
   class ILogger {
+    <<interface · puerto>>
+  }
+  class IScoreQueue {
     <<interface · puerto>>
   }
   class GameModule {
@@ -58,35 +58,43 @@ classDiagram
   class ILevelBuilder~TSetup~ {
     <<interface · Builder>>
   }
+  class ILevelParser {
+    <<interface · puerto · punto de extensión>>
+  }
+  class SortLevelBuilder {
+    <<Builder concreto · vista 2b>>
+  }
 
   %% ===================== hexa_infrastructure · ADAPTADORES =====================
   class DriftProgressRepository {
     <<Adapter · drift/SQLite>>
     -db: AppDatabase
   }
-  class DriftSavedGameStore {
+  class DriftScoreQueue {
     <<Adapter · drift/SQLite>>
     -db: AppDatabase
   }
   class AppDatabase {
     <<drift>>
-    game_progress · level_progress · saved_games
+    game_progress · level_progress · pending_scores
+    columna data en json, la guarda cada IProgressModel
   }
   class AssetLevelSource {
     <<Adapter · assets JSON>>
-    -director: LevelJsonDirector
+    -catalog: GameCatalog — pide el levelParser del gameId
   }
   class RemoteLevelSource {
     <<Adapter · GET /games/:gameId/levels>>
+    -catalog: GameCatalog — pide el levelParser del gameId
     +levels(game: String) Future~List‹GameSetup›~
   }
   class FallbackLevelSource {
     <<Adapter · catálogo de niveles>>
     +levels(game: String) Future~List‹GameSetup›~
   }
-  class LevelJsonDirector {
-    <<Builder (director)>>
-    +build(json: Map, b: ILevelBuilder) GameSetup
+  class SortLevelParser {
+    <<Adapter · Builder (director) de Sort>>
+    +parse(json: Map) GameSetup — withSeed · withColors · withGoal · build
   }
   class DioApiGateway {
     <<Adapter · dio + JWT>>
@@ -104,24 +112,71 @@ classDiagram
     <<Adapter · Singleton (alcance único DI)>>
   }
   class SecureSeedProvider
+  class StopwatchClock {
+    <<Adapter · Stopwatch de Dart>>
+    +elapsed() Duration
+  }
   class DebugLogger
 
   %% ===================== app · UN MÓDULO POR VARIANTE =====================
   class HexaLinesModule {
     -factory: HexaLinesFactory
-    -serializer: LinesStateSerializer
   }
   class HexaSortModule {
     -factory: HexaSortFactory
-    -serializer: SortStateSerializer
   }
   class HexaMergeModule {
     -factory: HexaMergeFactory
-    -serializer: MergeStateSerializer
   }
-  class LinesStateSerializer
-  class SortStateSerializer
-  class MergeStateSerializer
+  class IGameUiModule {
+    <<interface · borde de presentación · ISP>>
+    +id: String — el mismo que en GameModule
+    +buildBoard(vm: GameViewModel) Widget — HexBoardView‹TCell› con su CellRenderer‹TCell›
+    +createMoveInput() IMoveInput‹…›
+    +buildControls(vm: GameViewModel) Widget? — bandeja, paleta o metas; null si no hay
+    +sounds: Map‹Type, String› — sonido por evento de la variante
+  }
+
+  %% ===================== app · TABLERO VISUAL COMPARTIDO =====================
+  class HexBoardView~TCell~ {
+    <<BoardRenderer · widget compartido>>
+    -renderer: CellRenderer~TCell~
+    +cells: List~CellVM‹TCell›~ — recorre BoardShape.cells: cualquier forma
+    +hitTest(p: Offset) HexCoord? — toque o arrastre → coordenada axial
+  }
+  class GameScreen {
+    <<pantalla genérica · la misma para todos los juegos>>
+    -board: Widget — lo crea IGameUiModule.buildBoard
+    -vm: GameViewModel
+  }
+  class BoardGesture {
+    <<inmutable · tap · arrastre · deslizamiento>>
+    +kind: GestureKind
+    +from: HexCoord?
+    +to: HexCoord?
+    +trayIndex: int?
+    +direction: HexDirection?
+  }
+  class GestureKind {
+    <<enumeration>>
+    tap
+    drag
+    swipe
+  }
+  class IMoveInput~TMove~ {
+    <<interface · Strategy · punto de extensión>>
+    +toMove(g: BoardGesture, ui: UiState) TMove? — null si el gesto no aplica
+  }
+  class LinesMoveInput
+  class SortMoveInput
+  class MergeMoveInput
+  class CellRenderer~TCell~ {
+    <<interface · Strategy · punto de extensión>>
+    +paint(canvas: Canvas, c: HexCoord, cell: TCell) void
+  }
+  class LinesCellRenderer
+  class SortCellRenderer
+  class MergeCellRenderer
 
   %% ===================== app · PRESENTACIÓN =====================
   class GameViewModel {
@@ -129,10 +184,10 @@ classDiagram
     -facade: GameServiceFacade
     +state: UiState
     +board: List~CellVM~ — lo que dibuja la vista
-    +onDrop(trayIndex, c: HexCoord) void
-    +onTap(c: HexCoord) void
-    +onSwipe(d: HexDirection) void
-    +onUndo() void
+    -input: IMoveInput‹TMove› — lo aporta el módulo del juego
+    +onGesture(g: BoardGesture) void — input.toMove(g) → session.move
+    +onUndo() void  (solo si el motor es IUndoable)
+    +onRedo() void  (solo si el motor es IRedoable → facade.redo)
     +onAnimationsDone() void  (→ session.finishResolving)
   }
   class GameServiceFacade {
@@ -140,38 +195,46 @@ classDiagram
     -start: UseCase
     -move: UseCase
     -undo: UseCase
+    -redo: UseCase
     -save: UseCase
     +start(game, setup) Future
     +move(m) Future
     +undo() Future
+    +redo() Future
     +finish(result) Future
   }
   class AudioManager {
     <<Singleton (alcance único DI) · Observer · Adapter>>
-    -sounds: Map~Type, String~ — cada módulo registra los de su variante
+    -sounds: Map‹Type, String› — los aporta cada IGameUiModule
     +onEvent(e: GameEvent) void  (sonido por defecto si no lo conoce)
     +setMuted(m: bool) void
   }
   class AppProviders {
     <<Composition Root · Riverpod>>
     +catalog: Provider~GameCatalog~
+    +uiModules: Provider~Map‹String, IGameUiModule›~ — por gameId
     +useCases: Provider~...~ — envueltos con aspectos
   }
 
   %% ===================== RELACIONES =====================
   DriftProgressRepository ..|> IProgressRepository
-  DriftSavedGameStore ..|> ISavedGameStore
   DriftProgressRepository --> AppDatabase
-  DriftSavedGameStore --> AppDatabase
+  DriftScoreQueue ..|> IScoreQueue
+  DriftScoreQueue --> AppDatabase
   RemoteLevelSource ..|> ILevelSource
-  RemoteLevelSource --> LevelJsonDirector : valida y construye
+  RemoteLevelSource ..> ILevelParser : por gameId
+  RemoteLevelSource --> GameCatalog
   FallbackLevelSource ..|> ILevelSource
   FallbackLevelSource --> RemoteLevelSource : fuente preferida
   FallbackLevelSource --> AssetLevelSource : catálogo incluido sin red
   AppProviders ..> FallbackLevelSource : inyecta en LoadLevelsUseCase
   AssetLevelSource ..|> ILevelSource
-  AssetLevelSource --> LevelJsonDirector
-  LevelJsonDirector ..> ILevelBuilder : dirige
+  AssetLevelSource ..> ILevelParser : por gameId
+  AssetLevelSource --> GameCatalog
+  SortLevelParser ..|> ILevelParser
+  SortLevelParser ..> SortLevelBuilder : «create» y dirige
+  SortLevelBuilder ..|> ILevelBuilder
+  HexaSortModule ..> SortLevelParser : «create»
   DioApiGateway ..|> IProgressGateway
   DioApiGateway ..|> ILeaderboardGateway
   DioApiGateway ..|> IAuthGateway
@@ -179,19 +242,43 @@ classDiagram
   DioApiGateway --> ProblemJsonMapper
   LocalSessionStore ..|> ISessionStore
   SecureSeedProvider ..|> ISeedProvider
+  StopwatchClock ..|> IClock
+  HexaSortModule --> IClock : sella PlaceStack.at
   DebugLogger ..|> ILogger
 
   HexaLinesModule ..|> GameModule
   HexaSortModule ..|> GameModule
   HexaMergeModule ..|> GameModule
-  HexaLinesModule --> LinesStateSerializer
-  HexaSortModule --> SortStateSerializer
-  HexaMergeModule --> MergeStateSerializer
-  LinesStateSerializer ..|> IStateSerializer : «bind» TState→LinesState
-  SortStateSerializer ..|> IStateSerializer : «bind» TState→SortState
-  MergeStateSerializer ..|> IStateSerializer : «bind» TState→MergeState
+  HexaLinesModule ..|> IGameUiModule
+  HexaSortModule ..|> IGameUiModule
+  HexaMergeModule ..|> IGameUiModule
+  GameScreen ..> IGameUiModule : tablero, input y controles
+  IGameUiModule ..> HexBoardView : «create» ya tipado
+  IGameUiModule ..> CellRenderer : «create»
+  IGameUiModule ..> IMoveInput : «create»
+  AppProviders ..> IGameUiModule : registra por gameId
+  AudioManager ..> IGameUiModule : sounds
   GameViewModel --> "1" GameServiceFacade : facade
   GameViewModel ..> GameEvent : escucha
+  HexBoardView --> "1" CellRenderer : renderer
+  GameScreen o-- "1" HexBoardView : vía buildBoard
+  GameScreen --> "1" GameViewModel
+  GameViewModel --> "1" IMoveInput : input
+  IMoveInput ..> BoardGesture : traduce
+  BoardGesture --> GestureKind
+  LinesMoveInput ..|> IMoveInput : «bind» TMove→PlacePiece
+  SortMoveInput ..|> IMoveInput : «bind» TMove→PlaceStack
+  MergeMoveInput ..|> IMoveInput : «bind» TMove→Slide
+  HexaLinesModule ..> LinesMoveInput : «create»
+  HexaSortModule ..> SortMoveInput : «create»
+  HexaMergeModule ..> MergeMoveInput : «create»
+  HexBoardView ..> GameViewModel : cells · gestos → onGesture
+  LinesCellRenderer ..|> CellRenderer : «bind» TCell→TileColor
+  SortCellRenderer ..|> CellRenderer : «bind» TCell→ColorStack
+  MergeCellRenderer ..|> CellRenderer : «bind» TCell→MergeTile
+  HexaLinesModule ..> LinesCellRenderer : «create»
+  HexaSortModule ..> SortCellRenderer : «create»
+  HexaMergeModule ..> MergeCellRenderer : «create»
   GameServiceFacade --> UseCase : usa (decorados)
   AudioManager ..> GameEvent : escucha
   GameServiceFacade --> AudioManager : silenciar / volumen
@@ -200,10 +287,14 @@ classDiagram
   AppProviders ..> UseCase : envuelve con aspectos
   AppProviders ..> DioApiGateway : «create»
   AppProviders ..> DriftProgressRepository : «create»
+  AppProviders ..> DriftScoreQueue : «create»
 
   note for DioApiGateway "Un adaptador, tres puertos (ISP del lado<br>del puerto). Los errores RFC 9457 de la API<br>se traducen a ApiFailure en un solo lugar."
   note for AppProviders "Único lugar que conoce las clases concretas.<br>Agregar Hexa Fill = 1 módulo nuevo +<br>1 línea aquí."
-  note for HexaMergeModule "Cada módulo trae además su widget de celda;<br>se omite por ser UI de bajo nivel (enunciado 4.1).<br>El de Merge crea su partida con UndoableGameEngine."
+  note for HexaMergeModule "El de Merge crea su partida con UndoableGameEngine."
+  note for IGameUiModule "GameModule (capa 2) es Dart puro y no conoce<br>Flutter. Lo visual de cada juego va aquí (capa 3):<br>cada módulo implementa las dos interfaces y<br>GameScreen pide la suya a AppProviders por id.<br>buildBoard crea HexBoardView‹TCell› con su<br>CellRenderer‹TCell›: los genéricos se cierran en el<br>módulo y Dart revisa los tipos al compilar.<br>Una variante nueva no modifica GameScreen."
+  note for IMoveInput "Una variante que se juega distinto (por ejemplo,<br>pintar celdas en Hexa Fill) trae su IMoveInput,<br>su CellRenderer y su módulo. GameScreen,<br>GameViewModel y HexBoardView no se modifican."
+  note for HexBoardView "Un solo tablero para los 3 juegos (SRP: el renderizado<br>separado de las reglas). Cada variante solo aporta<br>cómo se pinta su celda. El enunciado califica como<br>insuficiente repetir tablero o renderizado."
 
   %% ===================== LEYENDA =====================
   class LEG1["Capa 1 · Entidades — núcleo genérico (hexa_engine/core)"]
@@ -217,10 +308,19 @@ classDiagram
 %% layer:adapter LEG3
 %% layer:extension LEG5
 
-%% layer:application IProgressRepository ISavedGameStore ILevelSource IProgressGateway ILeaderboardGateway IAuthGateway ISessionStore ISeedProvider ILogger GameCatalog UseCase
-%% layer:extapp GameModule IStateSerializer
+%% layer:application IScoreQueue IClock IProgressRepository ILevelSource IProgressGateway ILeaderboardGateway IAuthGateway ISessionStore ISeedProvider ILogger GameCatalog UseCase
+%% layer:extapp GameModule
 %% layer:domain GameEvent ILevelBuilder
-%% layer:adapter DriftProgressRepository DriftSavedGameStore AppDatabase AssetLevelSource LevelJsonDirector DioApiGateway ProblemJsonMapper LocalSessionStore SecureSeedProvider DebugLogger HexaLinesModule HexaSortModule HexaMergeModule LinesStateSerializer SortStateSerializer MergeStateSerializer GameViewModel GameServiceFacade AudioManager AppProviders
+%% layer:variant SortLevelBuilder
+%% layer:extapp ILevelParser
+%% layer:adapter DriftProgressRepository AppDatabase AssetLevelSource DioApiGateway ProblemJsonMapper LocalSessionStore SecureSeedProvider DebugLogger HexaLinesModule HexaSortModule HexaMergeModule GameViewModel GameServiceFacade AudioManager AppProviders
+
+
+%% layer:adapter RemoteLevelSource StopwatchClock HexBoardView LinesCellRenderer SortCellRenderer MergeCellRenderer
+%% layer:extadp CellRenderer IMoveInput IGameUiModule
+%% layer:adapter GestureKind GameScreen BoardGesture LinesMoveInput SortMoveInput MergeMoveInput
+
+%% layer:adapter FallbackLevelSource SortLevelParser DriftScoreQueue
 
   %% ---- colores por capa ----
   style LEG1 fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
@@ -228,8 +328,9 @@ classDiagram
   style LEG2 fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style LEG3 fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
   style LEG5 fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IScoreQueue fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style IClock fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style IProgressRepository fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
-  style ISavedGameStore fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style ILevelSource fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style IProgressGateway fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style ILeaderboardGateway fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
@@ -240,14 +341,13 @@ classDiagram
   style GameCatalog fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style UseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style GameModule fill:#FCF3CF,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
-  style IStateSerializer fill:#FCF3CF,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
   style GameEvent fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
   style ILevelBuilder fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style SortLevelBuilder fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style ILevelParser fill:#FCF3CF,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
   style DriftProgressRepository fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
-  style DriftSavedGameStore fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
   style AppDatabase fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
   style AssetLevelSource fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
-  style LevelJsonDirector fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
   style DioApiGateway fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
   style ProblemJsonMapper fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
   style LocalSessionStore fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
@@ -256,16 +356,25 @@ classDiagram
   style HexaLinesModule fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
   style HexaSortModule fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
   style HexaMergeModule fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
-  style LinesStateSerializer fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
-  style SortStateSerializer fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
-  style MergeStateSerializer fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
   style GameViewModel fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
   style GameServiceFacade fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
   style AudioManager fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
   style AppProviders fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
-
-%% layer:adapter RemoteLevelSource
   style RemoteLevelSource fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
-
-%% layer:adapter FallbackLevelSource
+  style StopwatchClock fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style HexBoardView fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style LinesCellRenderer fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style SortCellRenderer fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style MergeCellRenderer fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style CellRenderer fill:#D5F5E3,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IMoveInput fill:#D5F5E3,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IGameUiModule fill:#D5F5E3,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style GestureKind fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style GameScreen fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style BoardGesture fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style LinesMoveInput fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style SortMoveInput fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style MergeMoveInput fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
   style FallbackLevelSource fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style SortLevelParser fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style DriftScoreQueue fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B

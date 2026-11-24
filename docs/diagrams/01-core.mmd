@@ -1,5 +1,5 @@
 ---
-title: "HexaBlock Suite · Modelo de clases v5 (1/5) — Núcleo genérico · packages/hexa_engine/lib/src/core"
+title: "HexaBlock Suite · Modelo de clases v6.3 (1/5) — Núcleo genérico · packages/hexa_engine/lib/src/core"
 config:
   layout: elk
   theme: base
@@ -53,7 +53,7 @@ classDiagram
   class HexBoard~TCell extends Object~ {
     <<Iterator · inmutable>>
     +shape: BoardShape
-    -cells: Map~HexCoord, TCell~
+    -cells: Map‹HexCoord, TCell›
     +operator [](c: HexCoord) TCell?
     +isFree(c: HexCoord) bool
     +put(c: HexCoord, cell: TCell) HexBoard~TCell~
@@ -69,9 +69,9 @@ classDiagram
   }
   class Piece~TCell extends Object~ {
     <<Prototype>>
-    -offsets: Map~HexCoord, TCell~
+    -offsets: Map‹HexCoord, TCell›
     +rotated(steps: int) Piece~TCell~
-    +placedAt(anchor: HexCoord) Map~HexCoord, TCell~
+    +placedAt(anchor: HexCoord) Map‹HexCoord, TCell›
     +size: int
   }
 
@@ -106,6 +106,9 @@ classDiagram
   class GameEnded {
     +outcome: GameOutcome
   }
+  class GoalReached {
+    <<evento base · meta alcanzada, la partida sigue>>
+  }
   class GameOutcome {
     <<enumeration>>
     ongoing · victory · defeat
@@ -114,7 +117,7 @@ classDiagram
   %% ===================== MOTOR =====================
   class GameEngine~TCell, TMove, TState~ {
     <<Observer (sujeto) · sin if por variante>>
-    -rules: IGameRules~TCell, TMove, TState~
+    -rules: IGameRules‹TCell, TMove, TState›
     -scoring: IScoringPolicy~TState~
     -state: TState
     -score: Score
@@ -127,7 +130,7 @@ classDiagram
   }
   class UndoableGameEngine~TCell, TMove, TState~ {
     <<Command (invocador) · sólo Hexa Merge>>
-    -history: MoveHistory~TMove, TState~
+    -history: MoveHistory‹TMove, TState›
     +play(m: TMove) TurnResult~TState~
     +canUndo: bool
     +undo() void  (restore con before del comando)
@@ -140,15 +143,22 @@ classDiagram
     +execute(applyTurn) TurnResult~TState~
   }
   class MoveHistory~TMove, TState~ {
-    -capacity: int — Merge = 1
+    -capacity: int — Merge = 1; sin límite si la variante lo pide
     -done: List~MoveCommand~
+    -undone: List~MoveCommand~ — pila de rehacer; push la vacía
     +push(c: MoveCommand) void
     +popUndo() MoveCommand?
+    +popRedo() MoveCommand?
   }
   class IUndoable {
     <<interface · capacidad ISP>>
     +canUndo: bool
     +undo() void
+  }
+  class IRedoable {
+    <<interface · capacidad ISP · lista para una variante nueva>>
+    +canRedo: bool
+    +redo() void
   }
 
   %% ===================== PUNTUACIÓN =====================
@@ -204,6 +214,17 @@ classDiagram
   class IProgressModel {
     <<interface · Strategy · punto de extensión>>
     +record(r: GameResult) ProgressDelta
+    +toJson() Map‹String, Object› — sus datos propios, sin columnas fijas
+    +restore(data: Map‹String, Object›) void
+  }
+  class GameResult {
+    <<inmutable>>
+    +gameId: String
+    +score: Score
+    +outcome: GameOutcome
+    +levelId: String?
+    +moves: int
+    +elapsed: Duration
   }
   class HighScoreProgress {
     <<Lines · Merge>>
@@ -221,7 +242,7 @@ classDiagram
     +id: String — p. ej. hexa-lines; un texto, así una variante nueva no toca el núcleo
     +createBoardShape(setup: GameSetup) BoardShape
     +createPieceSource(setup: GameSetup) IPieceSource~TPiece~
-    +createRules(setup: GameSetup, pieces: IPieceSource‹TPiece›) IGameRules~TCell, TMove, TState~
+    +createRules(setup: GameSetup, pieces: IPieceSource‹TPiece›) IGameRules‹TCell, TMove, TState›
     +createScoring(setup: GameSetup) IScoringPolicy~TState~
     +createProgressModel() IProgressModel
     +createInitialState(setup: GameSetup) TState
@@ -239,7 +260,7 @@ classDiagram
     +seed: int
     +boardRadius: int — de configuración: Lines 4, Sort 2, Merge 2
     +levelId: String?
-    +spec: Map~String, Object~
+    +spec: Map‹String, Object›
   }
 
   %% ===================== RELACIONES =====================
@@ -260,6 +281,7 @@ classDiagram
   MoveRejected --|> GameEvent
   ScoreChanged --|> GameEvent
   GameEnded --|> GameEvent
+  GoalReached --|> GameEvent
   GameState --> "1" IRandom : random
   IGameRules ..> GameOutcome
 
@@ -270,6 +292,7 @@ classDiagram
   UndoableGameEngine --|> GameEngine
   UndoableGameEngine ..|> IUndoable
   UndoableGameEngine *-- "1" MoveHistory : history
+  IProgressModel ..> GameResult : record
   MoveHistory o-- "0..*" MoveCommand
   MoveCommand ..> TurnResult : aplica turno base una sola vez
   UndoableGameEngine ..> MoveCommand : usa before / scoreBefore
@@ -293,8 +316,11 @@ classDiagram
   GameVariantFactory ..> IProgressModel : «create»
   ILevelBuilder ..> GameSetup : TSetup = GameSetup
 
+  note for IRedoable "Ningún juego actual la usa. Una variante con<br>rehacer crea su propio motor que la implementa:<br>no se modifica UndoableGameEngine ni MoveHistory."
+  note for GameResult "moves y elapsed existen en toda partida:<br>un modelo de progreso nuevo (estrellas, mejor<br>tiempo, menos movimientos) no obliga a cambiarlo."
   note for UndoableGameEngine "Subclase (LSP): sustituye a GameEngine donde se<br>espere. Guarda un turno válido; al restaurar recupera<br>tablero, marcador y cursor aleatorio. Sólo Merge la usa: Lines y Sort no<br>implementan IUndoable (ISP, ejemplo del enunciado)."
   note for GameEngine "Ciclo del turno (playTurn): validar → aplicar →<br>resolver → reponer → evaluar → notificar.<br>Movimiento inválido: estado igual + MoveRejected.<br>Nunca pregunta qué variante es (LSP/OCP).<br>En Dart: @nonVirtual y @protected de package:meta."
+  note for GoalReached "Una variante que gana pero deja seguir jugando<br>emite un evento que hereda de este. La sesión<br>solo conoce GoalReached, nunca el evento<br>concreto de la variante (regla de dependencia)."
   note for GameEvent "Abierto (no sealed): el núcleo sólo define los eventos<br>comunes. LinesCleared, StackTransferred, TilesMerged…<br>viven en su variante: una 5.ª variante agrega sus<br>eventos sin tocar el núcleo (OCP)."
   note for IRandom "Regla de inmutabilidad: apply() trabaja con<br>s.random.copy() y guarda la copia en el estado<br>nuevo; nunca avanza el generador de un estado<br>anterior. Así deshacer repite la misma ficha.<br>createInitialState crea SeededRandom(setup.seed)."
   note for GameVariantFactory "TCell extends Object; TState extends GameState‹TCell›.<br>La fuente produce TPiece. Sólo el resolver de fusión<br>exige T extends Mergeable‹T›."
@@ -312,8 +338,8 @@ classDiagram
 %% layer:adapter LEG3
 %% layer:extension LEG5
 
-%% layer:extension IGameRules IScoringPolicy IPieceSource IProgressModel GameVariantFactory GameState
-%% layer:domain HexCoord HexDirection HexGeometry HexAxis BoardShape HexagonShape HexBoard Piece AbstractGameRules TurnResult GameEvent MoveRejected ScoreChanged GameEnded GameOutcome GameEngine UndoableGameEngine MoveCommand MoveHistory IUndoable Score BonusMultiplierDecorator SeededRandomPieceSource IRandom SeededRandom Mergeable SlideMergeResolver HighScoreProgress LevelProgress GameSetup TileColor ILevelBuilder
+%% layer:extension IRedoable IGameRules IScoringPolicy IPieceSource IProgressModel GameVariantFactory GameState
+%% layer:domain GameResult HexCoord HexDirection HexGeometry HexAxis BoardShape HexagonShape HexBoard Piece AbstractGameRules TurnResult GameEvent MoveRejected ScoreChanged GameEnded GoalReached GameOutcome GameEngine UndoableGameEngine MoveCommand MoveHistory IUndoable Score BonusMultiplierDecorator SeededRandomPieceSource IRandom SeededRandom Mergeable SlideMergeResolver HighScoreProgress LevelProgress GameSetup TileColor ILevelBuilder
 
   %% ---- colores por capa ----
   style LEG1 fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
@@ -321,12 +347,14 @@ classDiagram
   style LEG2 fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style LEG3 fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
   style LEG5 fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IRedoable fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
   style IGameRules fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
   style IScoringPolicy fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
   style IPieceSource fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
   style IProgressModel fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
   style GameVariantFactory fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
   style GameState fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style GameResult fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
   style HexCoord fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
   style HexDirection fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
   style HexGeometry fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
@@ -341,6 +369,7 @@ classDiagram
   style MoveRejected fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
   style ScoreChanged fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
   style GameEnded fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style GoalReached fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
   style GameOutcome fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
   style GameEngine fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
   style UndoableGameEngine fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
