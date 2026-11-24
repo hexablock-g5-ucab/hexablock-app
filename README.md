@@ -127,6 +127,22 @@ Abstract Factory assembles compatible families. Strategy selects rules and scori
 
 The [engine architecture test](packages/hexa_engine/test/architecture_test.dart) currently checks dependency boundaries. Each implementation PR should link its source and executable evidence here.
 
+### Application logging (NFR-006)
+
+Every application operation can implement [UseCase](packages/hexa_application/lib/src/use_cases/use_case.dart).
+At the composition root, wrap that operation once, for example:
+
+```dart
+final tracedMove = LoggingUseCase('apply_move', applyMove, logger);
+await tracedMove.execute(request);
+```
+
+The [decorator](packages/hexa_application/lib/src/aspects/logging_use_case.dart) records entry, outcome
+and elapsed milliseconds through an injected [ILogger](packages/hexa_application/lib/src/ports/logger.dart)
+port. It forwards the original result or exception. Request values, results and exception messages
+stay out of the log. The first gameplay use case can reuse this wrapper when wired into the app.
+[Application tests](packages/hexa_application/test/logging_use_case_test.dart) exercise the public package API.
+
 ## Running tests
 
 From the workspace root:
@@ -135,6 +151,8 @@ From the workspace root:
 dart format --output=none --set-exit-if-changed .
 flutter analyze
 cd packages/hexa_engine
+dart test
+cd ../hexa_application
 dart test
 cd ../../app
 flutter test

@@ -1,5 +1,11 @@
 # Handoff
 
+## Role C · 2026-11-24
+
+The first v6.3 application contracts are exported by `package:hexa_application/hexa_application.dart`.
+UseCase and LoggingUseCase are ready for composition with a concrete operation and ILogger adapter.
+Next dependency for shared screens: agree on gesture and coordinate types with the board owner.
+
 Snapshot of the real state of the repository so any teammate or agent can resume work.
 Updated in the PR that closes each phase (template: `harness/templates/handoff_update_template.md`).
 

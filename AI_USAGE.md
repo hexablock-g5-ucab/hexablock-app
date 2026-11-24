@@ -24,6 +24,7 @@ Record additional tools when they are actually used. If the interface does not i
 | [AI-002](docs/ai-log/AI-002.md) | 2026-11-11 | P00 bootstrap | Claude Opus 5.5 | Repository audit against the statement and setup fixes | .github/, .claude/, docs/ | 100 (tooling only) |
 | [AI-003](docs/ai-log/AI-003.md) | 2026-11-20 | Design baseline | OpenAI Codex | Final class model and documentation | [Model](docs/diagrams/README.md) | N/A (documentation) |
 | [AI-004](docs/ai-log/AI-004.md) | 2026-11-23 | Design baseline v6.3 | Claude Opus 5.5, reviewed with Gemini | Class model v6.3 and complete README diagram | [Model](docs/diagrams/README.md) | N/A (documentation) |
+| [AI-005](docs/ai-log/AI-005.md) | 2026-11-24 | Role C / NFR-006 | OpenAI Codex | Implement and test application logging | hexa_application | ~100% of new product code |
 
 ## Entry template (copy to `docs/ai-log/AI-xxx.md`)
 
