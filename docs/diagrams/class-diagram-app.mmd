@@ -1,0 +1,1168 @@
+---
+title: "HexaBlock Suite · Class model v6.3 (frozen) — Flutter client (hexablock-app), all layers"
+config:
+  layout: elk
+  elk:
+    mergeEdges: true
+    nodePlacementStrategy: NETWORK_SIMPLEX
+  theme: base
+  themeVariables:
+    fontFamily: "Inter"
+    fontSize: "15px"
+  class:
+    hideEmptyMembersBox: true
+---
+classDiagram
+  direction LR
+
+  class HexCoord {
+    <<inmutable>>
+    +q: int «final»
+    +r: int «final»
+    +s: int «get»
+    +operator +(o: HexCoord) HexCoord
+    +neighbor(d: HexDirection) HexCoord
+    +operator ==(o: Object) bool
+    +hashCode: int «get»
+  }
+  class HexDirection {
+    <<enumeration>>
+    east · northEast · northWest
+    west · southWest · southEast
+    +delta: HexCoord
+  }
+  class HexGeometry {
+    <<service · SRP>>
+    +distance(a, b)$ int
+    +rotate(c: HexCoord, steps: int)$ HexCoord
+    +line(shape, axis: HexAxis, value: int)$ Iterable~HexCoord~
+    +ring(center, radius: int)$ Iterable~HexCoord~
+  }
+  class HexAxis {
+    <<enumeration>>
+    q · r · s
+  }
+  class BoardShape {
+    <<interface · Strategy de forma>>
+    +contains(c: HexCoord) bool
+    +cells: Set~HexCoord~
+  }
+  class HexagonShape {
+    +radius: int — = GameSetup.boardRadius
+  }
+  class HexBoard~TCell extends Object~ {
+    <<Iterator · inmutable>>
+    +shape: BoardShape
+    -cells: Map‹HexCoord, TCell›
+    +operator [](c: HexCoord) TCell?
+    +isFree(c: HexCoord) bool
+    +put(c: HexCoord, cell: TCell) HexBoard~TCell~
+    +remove(c: HexCoord) HexBoard~TCell~
+    +line(axis: HexAxis, value: int) Iterable~HexCoord~
+    +ring(center: HexCoord, radius: int) Iterable~HexCoord~
+    +neighborsOf(c: HexCoord) Iterable~HexCoord~
+  }
+  class GameState~TCell extends Object~ {
+    <<interface>>
+    +board: HexBoard~TCell~
+    +random: IRandom — viaja en la instantánea
+  }
+  class Piece~TCell extends Object~ {
+    <<Prototype>>
+    -offsets: Map‹HexCoord, TCell›
+    +rotated(steps: int) Piece~TCell~
+    +placedAt(anchor: HexCoord) Map‹HexCoord, TCell›
+    +size: int
+  }
+  class IGameRules~TCell, TMove, TState~ {
+    <<interface · Strategy · punto de extensión>>
+    +isValid(s: TState, m: TMove) bool
+    +playTurn(s: TState, m: TMove) TurnResult~TState~
+    +evaluate(s: TState) GameOutcome
+  }
+  class AbstractGameRules~TCell, TMove, TState~ {
+    <<abstract · Template Method>>
+    +playTurn(s, m) TurnResult~TState~ «@nonVirtual»
+    #apply(s, m, events)* TState
+    #resolve(s, events)* TState
+    #afterResolve(s, events) TState
+  }
+  class TurnResult~TState~ {
+    +state: TState
+    +events: List~GameEvent~
+  }
+  class GameEvent {
+    <<abstract · Observer (mensaje) · abierto>>
+    +turn: int
+  }
+  class MoveRejected {
+    +reason: String
+  }
+  class ScoreChanged {
+    +score: Score
+  }
+  class GameEnded {
+    +outcome: GameOutcome
+  }
+  class GoalReached {
+    <<evento base · meta alcanzada, la partida sigue>>
+  }
+  class GameOutcome {
+    <<enumeration>>
+    ongoing · victory · defeat
+  }
+  class GameEngine~TCell, TMove, TState~ {
+    <<Observer (sujeto) · sin if por variante>>
+    -rules: IGameRules‹TCell, TMove, TState›
+    -scoring: IScoringPolicy~TState~
+    -state: TState
+    -score: Score
+    +play(m: TMove) TurnResult~TState~
+    +state: TState «get»
+    +score: Score «get»
+    +outcome: GameOutcome «get»
+    +events: Stream~GameEvent~ «get»
+    #restore(s: TState, score: Score) void  «@protected»
+  }
+  class UndoableGameEngine~TCell, TMove, TState~ {
+    <<Command (invocador) · sólo Hexa Merge>>
+    -history: MoveHistory‹TMove, TState›
+    +play(m: TMove) TurnResult~TState~
+    +canUndo: bool
+    +undo() void  (restore con before del comando)
+  }
+  class MoveCommand~TMove, TState~ {
+    <<Command>>
+    +move: TMove
+    +before: TState
+    +scoreBefore: Score
+    +execute(applyTurn) TurnResult~TState~
+  }
+  class MoveHistory~TMove, TState~ {
+    -capacity: int — Merge = 1; sin límite si la variante lo pide
+    -done: List~MoveCommand~
+    -undone: List~MoveCommand~ — pila de rehacer; push la vacía
+    +push(c: MoveCommand) void
+    +popUndo() MoveCommand?
+    +popRedo() MoveCommand?
+  }
+  class IUndoable {
+    <<interface · capacidad ISP>>
+    +canUndo: bool
+    +undo() void
+  }
+  class IRedoable {
+    <<interface · capacidad ISP · lista para una variante nueva>>
+    +canRedo: bool
+    +redo() void
+  }
+  class Score {
+    <<inmutable>>
+    +value: int
+    +add(points: int) Score
+    +compareTo(o: Score) int
+  }
+  class IScoringPolicy~TState~ {
+    <<interface · Strategy · punto de extensión>>
+    +pointsFor(before: TState, after: TState, events: List~GameEvent~) int
+  }
+  class BonusMultiplierDecorator~TState~ {
+    <<Decorator>>
+    -inner: IScoringPolicy~TState~
+    -factor: double
+  }
+  class IPieceSource~TPiece~ {
+    <<interface · Strategy · punto de extensión>>
+    +next(rng: IRandom) TPiece
+  }
+  class SeededRandomPieceSource~TPiece~ {
+    -catalog: List~TPiece~
+  }
+  class IRandom {
+    <<interface · DIP>>
+    +seed: int
+    +cursor: int — posición reproducible al serializar
+    +nextInt(max: int) int
+    +nextDouble() double
+    +copy() IRandom
+  }
+  class SeededRandom {
+    <<PRNG determinista>>
+    -state: int
+  }
+  class Mergeable~T extends Mergeable‹T›~ {
+    <<interface · cota F>>
+    +canMergeWith(o: T) bool
+    +mergeWith(o: T) T
+  }
+  class SlideMergeResolver~T extends Mergeable‹T›~ {
+    <<Strategy reutilizable>>
+    +slide(b: HexBoard~T~, d: HexDirection) SlideResult~T~
+  }
+  class IProgressModel {
+    <<interface · Strategy · punto de extensión>>
+    +record(r: GameResult) ProgressDelta
+    +toJson() Map‹String, Object› — sus datos propios, sin columnas fijas
+    +restore(data: Map‹String, Object›) void
+  }
+  class GameResult {
+    <<inmutable>>
+    +gameId: String
+    +score: Score
+    +outcome: GameOutcome
+    +levelId: String?
+    +moves: int
+    +elapsed: Duration
+  }
+  class HighScoreProgress {
+    <<Lines · Merge>>
+    -best: Score
+  }
+  class LevelProgress {
+    <<Sort>>
+    -completed: Set~String~
+    +isUnlocked(levelId: String) bool
+  }
+  class GameVariantFactory~TCell, TMove, TState, TPiece~ {
+    <<interface · Abstract Factory · punto de extensión>>
+    +id: String — p. ej. hexa-lines; un texto, así una variante nueva no toca el núcleo
+    +createBoardShape(setup: GameSetup) BoardShape
+    +createPieceSource(setup: GameSetup) IPieceSource~TPiece~
+    +createRules(setup: GameSetup, pieces: IPieceSource‹TPiece›) IGameRules‹TCell, TMove, TState›
+    +createScoring(setup: GameSetup) IScoringPolicy~TState~
+    +createProgressModel() IProgressModel
+    +createInitialState(setup: GameSetup) TState
+  }
+  class TileColor {
+    <<enumeration · paleta común>>
+    red · blue · green · yellow · purple
+  }
+  class ILevelBuilder~TSetup~ {
+    <<interface · Builder>>
+    +build() TSetup
+  }
+  class GameSetup {
+    <<inmutable>>
+    +seed: int
+    +boardRadius: int — de configuración: Lines 4, Sort 2, Merge 2
+    +levelId: String?
+    +spec: Map‹String, Object›
+  }
+  class PlacePiece {
+    <<TMove · inmutable>>
+    +trayIndex: int
+    +anchor: HexCoord
+    +rotation: int — 0 a 5 pasos de 60°
+  }
+  class LinesState {
+    <<TState · inmutable>>
+    +board: HexBoard~TileColor~
+    +tray: List~Piece‹TileColor›?~ — 3; se repone al colocar las 3
+    +streak: int — turnos seguidos limpiando líneas
+  }
+  class HexaLinesRules {
+    -clear: LineClearResolver
+    -pieces: IPieceSource~Piece‹TileColor›~
+    #apply(...) LinesState  (rota con Piece.rotated y coloca)
+    #resolve(...) LinesState  (borra líneas llenas)
+    #afterResolve(...) LinesState  (actualiza racha; repone bandeja vacía)
+    +evaluate(s) GameOutcome  (derrota si ninguna pieza cabe en ninguna rotación)
+  }
+  class LineClearResolver {
+    <<Strategy>>
+    +fullLines(b: HexBoard~TileColor~) List~Line~
+    +clear(b, lines) HexBoard~TileColor~
+  }
+  class LinesCleared {
+    <<evento de la variante>>
+    +count: int
+    +axes: Set~HexAxis~
+  }
+  class PolyhexCatalog {
+    <<datos>>
+    +pieces: List~Piece‹TileColor›~ — 1–5 celdas, misma probabilidad
+  }
+  class LinesComboScoring {
+    -perCell: int = 10
+    -comboFactor: double = 1.5 — por cada línea extra del mismo turno
+    +pointsFor(before, after, events) int
+  }
+  class LinesStreakBonus {
+    <<Decorator>>
+    -inner: IScoringPolicy~LinesState~
+    +pointsFor(before, after, events) int — racha 4 ×2 · 5 ×4 · desde 6 ×5
+  }
+  class HexaLinesFactory {
+    <<Abstract Factory (concreta)>>
+    +id = hexa-lines
+  }
+  class ColorStack {
+    <<TCell · inmutable>>
+    -chips: List~TileColor~ — abajo → arriba
+    +topColor: TileColor
+    +topRun: int
+    +takeTopRun() (ColorStack, List~TileColor~)
+    +push(chips: List~TileColor~) ColorStack
+  }
+  class PlaceStack {
+    <<TMove · inmutable>>
+    +trayIndex: int
+    +coord: HexCoord
+    +at: Duration — tiempo de partida; lo pone la app con un reloj inyectado
+  }
+  class SortState {
+    <<TState · inmutable>>
+    +board: HexBoard~ColorStack~
+    +tray: List~ColorStack?~ — 3 pilas; se repone al usarlas todas
+    +goal: ILevelGoal
+    +cleared: Map‹TileColor, int› — fichas eliminadas por color
+    +points: int — 10 por ficha eliminada + racha
+    +elapsed: Duration
+    +lastClearAt: Duration?
+  }
+  class ILevelGoal {
+    <<interface · Strategy · punto de extensión>>
+    +isMet(s: SortState) bool
+    +progress(s: SortState) double
+  }
+  class ScoreGoal {
+    <<meta de niveles iniciales>>
+    +target: int
+  }
+  class ColorsClearedGoal {
+    <<meta de niveles avanzados>>
+    +required: Map‹TileColor, int›
+  }
+  class TimeTiers {
+    <<inmutable · bonificación por tiempo>>
+    +bonus(elapsed: Duration) int — ≤1 min 100 · ≤2,5 min 50 · ≤5 min 10 · si no 0
+  }
+  class HexaSortRules {
+    -cascade: CascadeTransferResolver
+    -stacks: IPieceSource~ColorStack~
+    #apply(...) SortState  (coloca la pila)
+    #resolve(...) SortState  (cascada)
+    +evaluate(s) GameOutcome  (goal.isMet / sin celdas libres)
+  }
+  class CascadeTransferResolver {
+    <<Strategy>>
+    -direction: ITransferDirectionPolicy
+    -clearAt: int = 10
+    -order: List~HexDirection~ — sentido horario, empieza en northEast
+    +resolve(b, placedAt) CascadeResult
+    -amount(from, to) int — min(racha, 10 − racha destino)
+    -clearIfComplete(s: ColorStack) ColorStack? — elimina la pila completa
+  }
+  class ITransferDirectionPolicy {
+    <<interface · Strategy · punto de extensión>>
+    +onTie(a: HexCoord, b: HexCoord, placedAt: HexCoord) Transfer
+  }
+  class ExistingToPlacedPolicy {
+    <<regla del equipo>>
+    +onTie(...) Transfer — existente → nueva
+  }
+  class Transfer {
+    <<inmutable>>
+    +from: HexCoord
+    +to: HexCoord
+  }
+  class StackTransferred {
+    <<evento de la variante>>
+    +from: HexCoord
+    +to: HexCoord
+    +color: TileColor
+  }
+  class StackCompleted {
+    <<evento de la variante>>
+    +color: TileColor
+  }
+  class SortGoalScoring {
+    -tiers: TimeTiers
+    +pointsFor(before, after, events) int — Δpoints + bonus por tiempo al ganar
+  }
+  class SortLevelBuilder {
+    <<Builder (concreto)>>
+    +withGoal(g: ILevelGoal) SortLevelBuilder
+    +withColors(c: List~TileColor~) SortLevelBuilder
+    +withSeed(seed: int) SortLevelBuilder
+    +build() GameSetup
+  }
+  class HexaSortFactory {
+    <<Abstract Factory (concreta)>>
+    +id = hexa-sort
+  }
+  class MergeTile {
+    <<TCell · inmutable>>
+    +value: int — potencia de 2
+    +canMergeWith(o: MergeTile) bool
+    +mergeWith(o: MergeTile) MergeTile
+  }
+  class Slide {
+    <<TMove · inmutable>>
+    +direction: HexDirection
+  }
+  class MergeState {
+    <<TState · inmutable>>
+    +board: HexBoard~MergeTile~
+    +random: IRandom — heredado de GameState
+    +target: int — p. ej. 2048
+    +targetReached: bool — se pasa a true una sola vez
+  }
+  class HexaMergeRules {
+    -slider: SlideMergeResolver~MergeTile~
+    -spawner: IPieceSource~MergeTile~
+    #apply(...) MergeState  (deslizar + fusionar)
+    #resolve(...) MergeState  (no-op: la fusión ocurre al deslizar)
+    #afterResolve(...) MergeState  (genera 2 o 4)
+    +evaluate(s) GameOutcome  (derrota sin movimientos; el objetivo no termina la partida)
+  }
+  class TileSpawner {
+    <<inmutable>>
+    -pFour: double — 0,10 + 0,05 por ficha máxima nueva desde el 8, tope 0,40
+    +withMaxTile(maxTile: int) TileSpawner — copia con pFour ajustado
+    +next(rng: IRandom) MergeTile — sólo 2 o 4
+  }
+  class TargetReached {
+    <<evento de la variante>>
+    +value: int
+  }
+  class TilesMerged {
+    <<evento de la variante>>
+    +value: int
+  }
+  class MergeSumScoring {
+    +pointsFor(before, after, events) int  (suma de fusiones)
+  }
+  class HexaMergeFactory {
+    <<Abstract Factory (concreta)>>
+    +id = hexa-merge
+  }
+  class UseCase~I, O~ {
+    <<interface>>
+    +execute(input: I) Future~O~
+  }
+  class LoggingUseCase~I, O~ {
+    <<AOP · Decorator>>
+    -inner: UseCase‹I, O›
+    -log: ILogger
+  }
+  class StartGameUseCase {
+    -catalog: GameCatalog
+    -seeds: ISeedProvider
+    +execute(r: StartGameRequest) Future~GameSession~
+  }
+  class ApplyMoveUseCase {
+    +execute(r: MoveRequest) Future~MoveResult~  (MoveRequest = sesión + movimiento)
+  }
+  class UndoMoveUseCase {
+    +execute(s: GameSession) Future~MoveResult~
+  }
+  class RedoMoveUseCase {
+    +execute(s: GameSession) Future~MoveResult~  (solo si el motor es IRedoable)
+  }
+  class LoadLevelsUseCase {
+    -levels: ILevelSource
+    +execute(game: String) Future~List‹LevelSummary›~
+  }
+  class SaveProgressUseCase {
+    -repo: IProgressRepository
+    -catalog: GameCatalog — pide el IProgressModel del juego
+    -scores: IScoreQueue — encola el ScoreEntry de la partida
+    +execute(r: GameResult) Future~void~
+  }
+  class SyncProgressUseCase {
+    -repo: IProgressRepository
+    -gateway: IProgressGateway
+    +execute(game: String) Future~Progress~
+  }
+  class SyncLeaderboardUseCase {
+    -queue: IScoreQueue
+    -gateway: ILeaderboardGateway
+    +execute(game: String) Future~void~  (envía los pendientes del juego y los marca)
+  }
+  class GetLeaderboardUseCase {
+    -gateway: ILeaderboardGateway
+    +execute(q: LeaderboardQuery) Future~Leaderboard~
+  }
+  class LoginUseCase {
+    -auth: IAuthGateway
+    -session: ISessionStore
+  }
+  class RegisterUseCase {
+    -auth: IAuthGateway
+  }
+  class GameModule {
+    <<interface · borde no genérico>>
+    +id: String
+    +name: String
+    +progressKind: ProgressKind
+    +createSession(setup: GameSetup) GameSession‹…›  (genéricos cerrados aquí)
+    +createProgressModel() IProgressModel
+    +levelParser: ILevelParser? — null en juegos sin niveles
+  }
+  class ProgressKind {
+    <<enumeration>>
+    highScore
+    levels
+  }
+  class ILevelParser {
+    <<interface · puerto · punto de extensión>>
+    +parse(json: Map) GameSetup
+  }
+  class GameCatalog {
+    <<registro · OCP>>
+    -modules: Map‹String, GameModule›
+    +register(m: GameModule) void
+    +byId(id: String) GameModule
+    +all() List~GameModule~
+  }
+  class GameSession~TCell, TMove, TState~ {
+    <<State (contexto)>>
+    -state: SessionState
+    +engine: GameEngine‹TCell, TMove, TState›
+    +start() void  (MenuState → PlayingState)
+    +move(m: TMove) TurnResult~TState~  (PlayingState → ResolvingState)
+    +finishResolving() void  (→ PlayingState, GameOverState o VictoryState)
+    +continuePlaying() void  (VictoryState → PlayingState si la partida sigue)
+    +pause() void
+    +resume() void
+    +reconcileAfterHistoryChange() void  (tras deshacer o rehacer)
+    +events: Stream~GameEvent~
+  }
+  class SessionState {
+    <<interface · State>>
+    +onMove(ctx, m) void
+    +onPause(ctx) void
+    +onResume(ctx) void
+  }
+  class MenuState
+  class PlayingState
+  class ResolvingState
+  class PausedState
+  class GameOverState
+  class VictoryState {
+    +onContinue(ctx) void — sólo si el motor sigue en ongoing
+  }
+  class IProgressRepository {
+    <<interface · puerto>>
+    +load(game: String) Future~Progress~
+    +save(p: Progress) Future~void~
+  }
+  class ILevelSource {
+    <<interface · puerto>>
+    +levels(game: String) Future~List‹GameSetup›~
+  }
+  class IProgressGateway {
+    <<interface · puerto>>
+    +sync(p: Progress) Future~Progress~
+  }
+  class ILeaderboardGateway {
+    <<interface · puerto>>
+    +submit(s: ScoreEntry) Future~void~
+    +top(q: LeaderboardQuery) Future~Leaderboard~
+  }
+  class IScoreQueue {
+    <<interface · puerto>>
+    +enqueue(s: ScoreEntry) Future~void~
+    +pending(game: String) Future~List‹QueuedScore›~
+    +markSent(ids: List‹int›) Future~void~
+  }
+  class QueuedScore {
+    <<inmutable>>
+    +id: int — id local de la cola
+    +entry: ScoreEntry
+  }
+  class ScoreEntry {
+    <<inmutable · sale de GameResult>>
+    +gameId: String
+    +levelId: String?
+    +score: int
+    +moves: int
+    +elapsedMs: int
+  }
+  class IAuthGateway {
+    <<interface · puerto>>
+    +login(email, password) Future~Session~
+    +register(email, password, name) Future~void~
+  }
+  class ISessionStore {
+    <<interface · puerto>>
+    +current: Session?
+    +save(s: Session) Future~void~
+    +clear() Future~void~
+  }
+  class ISeedProvider {
+    <<interface · puerto>>
+    +newSeed() int
+  }
+  class IClock {
+    <<interface · puerto>>
+    +elapsed() Duration — tiempo de la partida en curso
+  }
+  class ILogger {
+    <<interface · puerto>>
+    +info(msg: String) void
+    +error(msg, e, st) void
+  }
+  class DriftProgressRepository {
+    <<Adapter · drift/SQLite>>
+    -db: AppDatabase
+  }
+  class DriftScoreQueue {
+    <<Adapter · drift/SQLite>>
+    -db: AppDatabase
+  }
+  class AppDatabase {
+    <<drift>>
+    game_progress · level_progress · pending_scores
+    columna data en json, la guarda cada IProgressModel
+  }
+  class AssetLevelSource {
+    <<Adapter · assets JSON>>
+    -catalog: GameCatalog — pide el levelParser del gameId
+  }
+  class RemoteLevelSource {
+    <<Adapter · GET /games/:gameId/levels>>
+    -catalog: GameCatalog — pide el levelParser del gameId
+    +levels(game: String) Future~List‹GameSetup›~
+  }
+  class FallbackLevelSource {
+    <<Adapter · catálogo de niveles>>
+    +levels(game: String) Future~List‹GameSetup›~
+  }
+  class SortLevelParser {
+    <<Adapter · Builder (director) de Sort>>
+    +parse(json: Map) GameSetup — withSeed · withColors · withGoal · build
+  }
+  class DioApiGateway {
+    <<Adapter · dio + JWT>>
+    -dio: Dio
+    -session: ISessionStore
+    +sync(p) Future~Progress~
+    +submit(s) Future~void~
+    +top(q) Future~Leaderboard~
+    +login(...) Future~Session~
+  }
+  class ProblemJsonMapper {
+    +toFailure(DioException) ApiFailure
+  }
+  class LocalSessionStore {
+    <<Adapter · Singleton (alcance único DI)>>
+  }
+  class SecureSeedProvider
+  class StopwatchClock {
+    <<Adapter · Stopwatch de Dart>>
+    +elapsed() Duration
+  }
+  class DebugLogger
+  class HexaLinesModule {
+    -factory: HexaLinesFactory
+  }
+  class HexaSortModule {
+    -factory: HexaSortFactory
+  }
+  class HexaMergeModule {
+    -factory: HexaMergeFactory
+  }
+  class IGameUiModule {
+    <<interface · borde de presentación · ISP>>
+    +id: String — el mismo que en GameModule
+    +buildBoard(vm: GameViewModel) Widget — HexBoardView‹TCell› con su CellRenderer‹TCell›
+    +createMoveInput() IMoveInput‹…›
+    +buildControls(vm: GameViewModel) Widget? — bandeja, paleta o metas; null si no hay
+    +sounds: Map‹Type, String› — sonido por evento de la variante
+  }
+  class HexBoardView~TCell~ {
+    <<BoardRenderer · widget compartido>>
+    -renderer: CellRenderer~TCell~
+    +cells: List~CellVM‹TCell›~ — recorre BoardShape.cells: cualquier forma
+    +hitTest(p: Offset) HexCoord? — toque o arrastre → coordenada axial
+  }
+  class GameScreen {
+    <<pantalla genérica · la misma para todos los juegos>>
+    -board: Widget — lo crea IGameUiModule.buildBoard
+    -vm: GameViewModel
+  }
+  class BoardGesture {
+    <<inmutable · tap · arrastre · deslizamiento>>
+    +kind: GestureKind
+    +from: HexCoord?
+    +to: HexCoord?
+    +trayIndex: int?
+    +direction: HexDirection?
+  }
+  class GestureKind {
+    <<enumeration>>
+    tap
+    drag
+    swipe
+  }
+  class IMoveInput~TMove~ {
+    <<interface · Strategy · punto de extensión>>
+    +toMove(g: BoardGesture, ui: UiState) TMove? — null si el gesto no aplica
+  }
+  class LinesMoveInput
+  class SortMoveInput
+  class MergeMoveInput
+  class CellRenderer~TCell~ {
+    <<interface · Strategy · punto de extensión>>
+    +paint(canvas: Canvas, c: HexCoord, cell: TCell) void
+  }
+  class LinesCellRenderer
+  class SortCellRenderer
+  class MergeCellRenderer
+  class GameViewModel {
+    <<Presenter · observa GameEvent>>
+    -facade: GameServiceFacade
+    +state: UiState
+    +board: List~CellVM~ — lo que dibuja la vista
+    -input: IMoveInput‹TMove› — lo aporta el módulo del juego
+    +onGesture(g: BoardGesture) void — input.toMove(g) → session.move
+    +onUndo() void  (solo si el motor es IUndoable)
+    +onRedo() void  (solo si el motor es IRedoable → facade.redo)
+    +onAnimationsDone() void  (→ session.finishResolving)
+  }
+  class GameServiceFacade {
+    <<Facade>>
+    -start: UseCase
+    -move: UseCase
+    -undo: UseCase
+    -redo: UseCase
+    -save: UseCase
+    +start(game, setup) Future
+    +move(m) Future
+    +undo() Future
+    +redo() Future
+    +finish(result) Future
+  }
+  class AudioManager {
+    <<Singleton (alcance único DI) · Observer · Adapter>>
+    -sounds: Map‹Type, String› — los aporta cada IGameUiModule
+    +onEvent(e: GameEvent) void  (sonido por defecto si no lo conoce)
+    +setMuted(m: bool) void
+  }
+  class AppProviders {
+    <<Composition Root · Riverpod>>
+    +catalog: Provider~GameCatalog~
+    +uiModules: Provider~Map‹String, IGameUiModule›~ — por gameId
+    +useCases: Provider~...~ — envueltos con aspectos
+  }
+
+  HexDirection --> HexCoord : delta
+  HexagonShape ..|> BoardShape
+  HexBoard *-- "1" BoardShape : shape
+  HexBoard ..> HexCoord : clave
+  HexBoard ..> HexAxis : line()
+  HexBoard ..> HexGeometry : delega recorridos
+  HexGeometry ..> HexCoord
+  GameState --> "1" HexBoard : board
+  Piece ..> HexCoord : offsets
+  AbstractGameRules ..|> IGameRules
+  IGameRules ..> GameState : TState extends GameState‹TCell›
+  IGameRules ..> TurnResult : produce
+  TurnResult o-- "0..*" GameEvent
+  MoveRejected --|> GameEvent
+  ScoreChanged --|> GameEvent
+  GameEnded --|> GameEvent
+  GoalReached --|> GameEvent
+  GameState --> "1" IRandom : random
+  IGameRules ..> GameOutcome
+  GameEngine --> "1" IGameRules : rules
+  GameEngine --> "1" IScoringPolicy : scoring
+  GameEngine *-- "1" Score
+  GameEngine ..> GameEvent : «publish»
+  UndoableGameEngine --|> GameEngine
+  UndoableGameEngine ..|> IUndoable
+  UndoableGameEngine *-- "1" MoveHistory : history
+  IProgressModel ..> GameResult : record
+  MoveHistory o-- "0..*" MoveCommand
+  MoveCommand ..> TurnResult : aplica turno base una sola vez
+  UndoableGameEngine ..> MoveCommand : usa before / scoreBefore
+  BonusMultiplierDecorator ..|> IScoringPolicy
+  BonusMultiplierDecorator o-- "1" IScoringPolicy : inner
+  SeededRandomPieceSource ..|> IPieceSource
+  IPieceSource ..> IRandom : recibe el del estado
+  SeededRandom ..|> IRandom
+  SlideMergeResolver ..> Mergeable : T extends
+  HighScoreProgress ..|> IProgressModel
+  LevelProgress ..|> IProgressModel
+  GameVariantFactory ..> GameSetup : recibe
+  GameVariantFactory ..> BoardShape : «create»
+  GameVariantFactory ..> IPieceSource : «create»
+  GameVariantFactory ..> IGameRules : «create»
+  GameVariantFactory ..> IScoringPolicy : «create»
+  GameVariantFactory ..> IProgressModel : «create»
+  ILevelBuilder ..> GameSetup : TSetup = GameSetup
+  LinesState ..|> GameState : «bind» TCell→TileColor
+  HexaLinesRules --|> AbstractGameRules : «bind» ‹TileColor, PlacePiece, LinesState›
+  HexaLinesRules *-- "1" LineClearResolver
+  HexaLinesRules --> "1" IPieceSource : pieces
+  SeededRandomPieceSource ..|> IPieceSource : «bind» TPiece→Piece‹TileColor›
+  HexaLinesFactory --> PolyhexCatalog : configura la fuente
+  LinesComboScoring ..|> IScoringPolicy : «bind» TState→LinesState
+  HexaLinesFactory ..|> GameVariantFactory : «bind» ‹TileColor, PlacePiece, LinesState, Piece‹TileColor››
+  HexaLinesFactory ..> HexagonShape : «create» radio = setup.boardRadius
+  HexaLinesFactory ..> SeededRandomPieceSource : «create»
+  HexaLinesFactory ..> HexaLinesRules : «create»
+  HexaLinesFactory ..> LinesComboScoring : «create»
+  LinesStreakBonus ..|> IScoringPolicy : «bind» TState→LinesState
+  LinesStreakBonus o-- "1" LinesComboScoring : inner
+  HexaLinesFactory ..> LinesStreakBonus : «create» envuelve la puntuación base
+  HexaLinesFactory ..> HighScoreProgress : «create»
+  LinesState --> "0..3" Piece : tray
+  LinesCleared --|> GameEvent
+  LineClearResolver ..> LinesCleared : emite
+  ColorStack --> TileColor
+  SortState ..|> GameState : «bind» TCell→ColorStack
+  HexaSortRules --|> AbstractGameRules : «bind» ‹ColorStack, PlaceStack, SortState›
+  HexaSortRules *-- "1" CascadeTransferResolver
+  HexaSortRules --> "1" IPieceSource : stacks
+  CascadeTransferResolver --> "1" ITransferDirectionPolicy : direction
+  ExistingToPlacedPolicy ..|> ITransferDirectionPolicy
+  ITransferDirectionPolicy ..> Transfer : devuelve
+  SortState --> "1" ILevelGoal : goal
+  ScoreGoal ..|> ILevelGoal
+  ColorsClearedGoal ..|> ILevelGoal
+  SortGoalScoring --> "1" TimeTiers
+  SortLevelBuilder ..> ILevelGoal : withGoal
+  StackTransferred --|> GameEvent
+  StackCompleted --|> GameEvent
+  CascadeTransferResolver ..> StackTransferred : emite
+  CascadeTransferResolver ..> StackCompleted : emite
+  SeededRandomPieceSource ..|> IPieceSource : «bind» TPiece→ColorStack
+  SortGoalScoring ..|> IScoringPolicy : «bind» TState→SortState
+  SortLevelBuilder ..|> ILevelBuilder : «bind» TSetup→GameSetup
+  HexaSortFactory ..|> GameVariantFactory : «bind» ‹ColorStack, PlaceStack, SortState, ColorStack›
+  HexaSortFactory ..> HexagonShape : «create» radio = setup.boardRadius
+  HexaSortFactory ..> SeededRandomPieceSource : «create»
+  HexaSortFactory ..> HexaSortRules : «create»
+  HexaSortFactory ..> SortGoalScoring : «create»
+  HexaSortFactory ..> LevelProgress : «create»
+  HexaSortFactory ..> ExistingToPlacedPolicy : «create» regla vigente
+  MergeTile ..|> Mergeable : «bind» T→MergeTile
+  MergeState ..|> GameState : «bind» TCell→MergeTile
+  HexaMergeRules --|> AbstractGameRules : «bind» ‹MergeTile, Slide, MergeState›
+  HexaMergeRules *-- "1" SlideMergeResolver : «bind» T→MergeTile
+  HexaMergeRules --> "1" IPieceSource : spawner
+  TileSpawner ..|> IPieceSource : «bind» TPiece→MergeTile
+  TileSpawner ..> IRandom : usa el del estado
+  TilesMerged --|> GameEvent
+  HexaMergeRules ..> TilesMerged : emite (con el SlideResult)
+  TargetReached --|> GoalReached
+  HexaMergeRules ..> TargetReached : emite al llegar a target
+  MergeSumScoring ..|> IScoringPolicy : «bind» TState→MergeState
+  HexaMergeFactory ..|> GameVariantFactory : «bind» ‹MergeTile, Slide, MergeState, MergeTile›
+  HexaMergeFactory ..> HexagonShape : «create» radio = setup.boardRadius
+  HexaMergeFactory ..> TileSpawner : «create»
+  HexaMergeFactory ..> HexaMergeRules : «create»
+  HexaMergeFactory ..> MergeSumScoring : «create»
+  HexaMergeFactory ..> HighScoreProgress : «create»
+  LoggingUseCase ..|> UseCase
+  LoggingUseCase o-- "1" UseCase : inner
+  LoggingUseCase --> ILogger
+  StartGameUseCase ..|> UseCase
+  ApplyMoveUseCase ..|> UseCase
+  UndoMoveUseCase ..|> UseCase
+  RedoMoveUseCase ..|> UseCase
+  LoadLevelsUseCase ..|> UseCase
+  SaveProgressUseCase ..|> UseCase
+  SyncProgressUseCase ..|> UseCase
+  SyncLeaderboardUseCase ..|> UseCase
+  GetLeaderboardUseCase ..|> UseCase
+  LoginUseCase ..|> UseCase
+  RegisterUseCase ..|> UseCase
+  StartGameUseCase --> GameCatalog
+  StartGameUseCase --> ISeedProvider
+  ApplyMoveUseCase ..> GameSession : move()
+  UndoMoveUseCase ..> GameSession : recupera engine y actualiza fase
+  UndoMoveUseCase ..> IUndoable : capacidad del motor de la sesión
+  RedoMoveUseCase ..> GameSession : recupera engine y actualiza fase
+  RedoMoveUseCase ..> IRedoable : capacidad del motor de la sesión
+  LoadLevelsUseCase --> ILevelSource
+  SaveProgressUseCase --> IProgressRepository
+  SaveProgressUseCase --> GameCatalog
+  SaveProgressUseCase --> IScoreQueue : enqueue
+  SyncProgressUseCase --> IProgressRepository
+  SyncProgressUseCase --> IProgressGateway
+  SyncLeaderboardUseCase --> IScoreQueue : pending · markSent
+  IScoreQueue ..> QueuedScore
+  QueuedScore --> ScoreEntry
+  SyncLeaderboardUseCase --> ILeaderboardGateway
+  GetLeaderboardUseCase --> ILeaderboardGateway
+  ILeaderboardGateway ..> ScoreEntry : envía
+  LoginUseCase --> IAuthGateway
+  LoginUseCase --> ISessionStore
+  RegisterUseCase --> IAuthGateway
+  GameCatalog o-- "3..*" GameModule
+  GameModule ..> GameVariantFactory : usa
+  GameModule ..> GameSession : «create»
+  GameModule --> ProgressKind
+  GameModule --> "0..1" ILevelParser : levelParser
+  GameSession --> "1" SessionState : state
+  GameSession --> "1" GameEngine : engine
+  GameModule ..> IProgressModel : «create» vía su factory
+  GameSession ..> GameEvent : reenvía
+  MenuState ..|> SessionState
+  PlayingState ..|> SessionState
+  ResolvingState ..|> SessionState
+  PausedState ..|> SessionState
+  GameOverState ..|> SessionState
+  VictoryState ..|> SessionState
+  ResolvingState ..> GoalReached : si llega y el motor sigue → VictoryState
+  DriftProgressRepository ..|> IProgressRepository
+  DriftProgressRepository --> AppDatabase
+  DriftScoreQueue ..|> IScoreQueue
+  DriftScoreQueue --> AppDatabase
+  RemoteLevelSource ..|> ILevelSource
+  RemoteLevelSource ..> ILevelParser : por gameId
+  RemoteLevelSource --> GameCatalog
+  FallbackLevelSource ..|> ILevelSource
+  FallbackLevelSource --> RemoteLevelSource : fuente preferida
+  FallbackLevelSource --> AssetLevelSource : catálogo incluido sin red
+  AppProviders ..> FallbackLevelSource : inyecta en LoadLevelsUseCase
+  AssetLevelSource ..|> ILevelSource
+  AssetLevelSource ..> ILevelParser : por gameId
+  AssetLevelSource --> GameCatalog
+  SortLevelParser ..|> ILevelParser
+  SortLevelParser ..> SortLevelBuilder : «create» y dirige
+  SortLevelBuilder ..|> ILevelBuilder
+  HexaSortModule ..> SortLevelParser : «create»
+  DioApiGateway ..|> IProgressGateway
+  DioApiGateway ..|> ILeaderboardGateway
+  DioApiGateway ..|> IAuthGateway
+  DioApiGateway --> ISessionStore : token JWT
+  DioApiGateway --> ProblemJsonMapper
+  LocalSessionStore ..|> ISessionStore
+  SecureSeedProvider ..|> ISeedProvider
+  StopwatchClock ..|> IClock
+  HexaSortModule --> IClock : sella PlaceStack.at
+  DebugLogger ..|> ILogger
+  HexaLinesModule ..|> GameModule
+  HexaSortModule ..|> GameModule
+  HexaMergeModule ..|> GameModule
+  HexaLinesModule ..|> IGameUiModule
+  HexaSortModule ..|> IGameUiModule
+  HexaMergeModule ..|> IGameUiModule
+  GameScreen ..> IGameUiModule : tablero, input y controles
+  IGameUiModule ..> HexBoardView : «create» ya tipado
+  IGameUiModule ..> CellRenderer : «create»
+  IGameUiModule ..> IMoveInput : «create»
+  AppProviders ..> IGameUiModule : registra por gameId
+  AudioManager ..> IGameUiModule : sounds
+  GameViewModel --> "1" GameServiceFacade : facade
+  GameViewModel ..> GameEvent : escucha
+  HexBoardView --> "1" CellRenderer : renderer
+  GameScreen o-- "1" HexBoardView : vía buildBoard
+  GameScreen --> "1" GameViewModel
+  GameViewModel --> "1" IMoveInput : input
+  IMoveInput ..> BoardGesture : traduce
+  BoardGesture --> GestureKind
+  LinesMoveInput ..|> IMoveInput : «bind» TMove→PlacePiece
+  SortMoveInput ..|> IMoveInput : «bind» TMove→PlaceStack
+  MergeMoveInput ..|> IMoveInput : «bind» TMove→Slide
+  HexaLinesModule ..> LinesMoveInput : «create»
+  HexaSortModule ..> SortMoveInput : «create»
+  HexaMergeModule ..> MergeMoveInput : «create»
+  HexBoardView ..> GameViewModel : cells · gestos → onGesture
+  LinesCellRenderer ..|> CellRenderer : «bind» TCell→TileColor
+  SortCellRenderer ..|> CellRenderer : «bind» TCell→ColorStack
+  MergeCellRenderer ..|> CellRenderer : «bind» TCell→MergeTile
+  HexaLinesModule ..> LinesCellRenderer : «create»
+  HexaSortModule ..> SortCellRenderer : «create»
+  HexaMergeModule ..> MergeCellRenderer : «create»
+  GameServiceFacade --> UseCase : usa (decorados)
+  AudioManager ..> GameEvent : escucha
+  GameServiceFacade --> AudioManager : silenciar / volumen
+  AppProviders ..> GameCatalog : registra 3 módulos
+  AppProviders ..> UseCase : envuelve con aspectos
+  AppProviders ..> DioApiGateway : «create»
+  AppProviders ..> DriftProgressRepository : «create»
+  AppProviders ..> DriftScoreQueue : «create»
+
+  note for IRedoable "Ningún juego actual la usa. Una variante con<br>rehacer crea su propio motor que la implementa:<br>no se modifica UndoableGameEngine ni MoveHistory."
+  note for GameResult "moves y elapsed existen en toda partida:<br>un modelo de progreso nuevo (estrellas, mejor<br>tiempo, menos movimientos) no obliga a cambiarlo."
+  note for UndoableGameEngine "Subclase (LSP): sustituye a GameEngine donde se<br>espere. Guarda un turno válido; al restaurar recupera<br>tablero, marcador y cursor aleatorio. Sólo Merge la usa: Lines y Sort no<br>implementan IUndoable (ISP, ejemplo del enunciado)."
+  note for GameEngine "Ciclo del turno (playTurn): validar → aplicar →<br>resolver → reponer → evaluar → notificar.<br>Movimiento inválido: estado igual + MoveRejected.<br>Nunca pregunta qué variante es (LSP/OCP).<br>En Dart: @nonVirtual y @protected de package:meta."
+  note for GoalReached "Una variante que gana pero deja seguir jugando<br>emite un evento que hereda de este. La sesión<br>solo conoce GoalReached, nunca el evento<br>concreto de la variante (regla de dependencia)."
+  note for GameEvent "Abierto (no sealed): el núcleo sólo define los eventos<br>comunes. LinesCleared, StackTransferred, TilesMerged…<br>viven en su variante: una 5.ª variante agrega sus<br>eventos sin tocar el núcleo (OCP)."
+  note for IRandom "Regla de inmutabilidad: apply() trabaja con<br>s.random.copy() y guarda la copia en el estado<br>nuevo; nunca avanza el generador de un estado<br>anterior. Así deshacer repite la misma ficha.<br>createInitialState crea SeededRandom(setup.seed)."
+  note for GameVariantFactory "TCell extends Object; TState extends GameState‹TCell›.<br>La fuente produce TPiece. Sólo el resolver de fusión<br>exige T extends Mergeable‹T›."
+  note for Mergeable "Cota F: sólo se fusionan objetos del mismo tipo.<br>El enunciado sugiere TCell = int para Merge, pero<br>int no puede implementar interfaces en Dart:<br>MergeTile envuelve el int (vista 2c)."
+  note for HexaLinesRules "No implementa IUndoable (ISP): Lines<br>no tiene deshacer; sólo Merge lo tiene.<br>27 líneas = 9 por eje en radio 4. Se borran<br>todas las líneas completas a la vez, sin importar<br>el color; la celda de un cruce se borra una vez."
+  note for LinesStreakBonus "La racha cuenta turnos seguidos que limpian<br>líneas y se corta con una pieza que no limpia nada.<br>El multiplicador empieza en el 4.º turno seguido."
+  note for ITransferDirectionPolicy "Regla general: pasa de la pila con menos fichas de ese<br>color a la que tiene más. Empate: la existente pasa a la<br>recién colocada (regla del equipo). Si ninguna es nueva,<br>decide el orden horario de CascadeTransferResolver."
+  note for CascadeTransferResolver "Solo pasan las fichas que faltan para llegar a 10; el<br>sobrante se queda en la pila de origen. Con 10 se elimina<br>la PILA COMPLETA (acordado con el profesor), sus fichas<br>cuentan en cleared por color, se emite StackCompleted<br>y se revisan otra vez los vecinos en orden horario."
+  note for PlaceStack "El tiempo entra como dato del movimiento:<br>el motor no lee el reloj y las pruebas<br>siguen siendo deterministas."
+  note for ILevelGoal "Cada nivel trae UNA meta en su JSON:<br>puntos (niveles iniciales) o fichas por<br>color (niveles avanzados)."
+  note for UndoableGameEngine "HexaMergeModule compone el motor con las reglas<br>y la puntuación que produce HexaMergeFactory.<br>Deshacer de 1 movimiento, como dice el enunciado:<br>capacidad 1, quita los puntos de ese movimiento."
+  note for HexaMergeRules "Cada ficha se fusiona una vez por deslizamiento,<br>empezando por el borde: 2,2,4 → 4,4 y 2,2,2 → 4,2.<br>Un deslizamiento sin cambios no es turno ni<br>genera ficha. Llegar a target emite TargetReached:<br>se gana, pero la partida sigue para mejorar el récord."
+  note for TileSpawner "afterResolve llama spawner.withMaxTile(máx. del<br>tablero).next(rng): la probabilidad sale del tablero,<br>así deshacer y repetir da la misma ficha."
+  note for MergeState "El estado del IRandom viaja en la instantánea:<br>deshacer y repetir el deslizamiento genera<br>la misma ficha (no se puede «pescar» un 4)."
+  note for GameModule "Borde no genérico y Dart puro: el selector y las<br>rutas sólo ven GameModule; los genéricos quedan<br>cerrados dentro de cada módulo. Lo visual del juego<br>va aparte, en IGameUiModule (vista 4), para que esta<br>capa no dependa de Flutter. Una variante nueva =<br>1 módulo + 1 línea en el catálogo."
+  note for IScoreQueue "Sin red, los puntajes esperan aquí. Al sincronizar<br>se envían los del juego y se marcan con su id<br>local: reintentar nunca duplica ni pierde puntajes."
+  note for ILevelParser "Solo lo tienen los juegos por niveles (hoy, Sort).<br>Los orígenes de niveles lo piden al catálogo por<br>gameId: una variante nueva con niveles trae su<br>parser y no se modifican."
+  note for VictoryState "Con GoalReached (en Merge, TargetReached al llegar<br>a 2048) se muestra la victoria, pero el motor sigue<br>en ongoing y el jugador puede continuar. Con<br>GameEnded(victory), como en Sort, termina el nivel."
+  note for LoggingUseCase "AOP sin librerías: el composition root envuelve<br>ApplyMoveUseCase (genérico) una sola vez y el<br>aspecto cubre las 3 variantes: registra nombre, resultado y duración<br>sin registrar credenciales ni datos personales."
+  note for DioApiGateway "Un adaptador, tres puertos (ISP del lado<br>del puerto). Los errores RFC 9457 de la API<br>se traducen a ApiFailure en un solo lugar."
+  note for AppProviders "Único lugar que conoce las clases concretas.<br>Agregar Hexa Fill = 1 módulo nuevo +<br>1 línea aquí."
+  note for HexaMergeModule "El de Merge crea su partida con UndoableGameEngine."
+  note for IGameUiModule "GameModule (capa 2) es Dart puro y no conoce<br>Flutter. Lo visual de cada juego va aquí (capa 3):<br>cada módulo implementa las dos interfaces y<br>GameScreen pide la suya a AppProviders por id.<br>buildBoard crea HexBoardView‹TCell› con su<br>CellRenderer‹TCell›: los genéricos se cierran en el<br>módulo y Dart revisa los tipos al compilar.<br>Una variante nueva no modifica GameScreen."
+  note for IMoveInput "Una variante que se juega distinto (por ejemplo,<br>pintar celdas en Hexa Fill) trae su IMoveInput,<br>su CellRenderer y su módulo. GameScreen,<br>GameViewModel y HexBoardView no se modifican."
+  note for HexBoardView "Un solo tablero para los 3 juegos (SRP: el renderizado<br>separado de las reglas). Cada variante solo aporta<br>cómo se pinta su celda. El enunciado califica como<br>insuficiente repetir tablero o renderizado."
+
+%% layer:domain HexCoord HexDirection HexGeometry HexAxis BoardShape HexagonShape HexBoard Piece AbstractGameRules TurnResult GameEvent MoveRejected ScoreChanged GameEnded GoalReached GameOutcome GameEngine UndoableGameEngine MoveCommand MoveHistory IUndoable Score BonusMultiplierDecorator SeededRandomPieceSource IRandom SeededRandom Mergeable SlideMergeResolver GameResult HighScoreProgress LevelProgress TileColor ILevelBuilder GameSetup
+%% layer:extension GameState IGameRules IRedoable IScoringPolicy IPieceSource IProgressModel GameVariantFactory
+%% layer:variant PlacePiece LinesState HexaLinesRules LineClearResolver LinesCleared PolyhexCatalog LinesComboScoring LinesStreakBonus HexaLinesFactory ColorStack PlaceStack SortState ScoreGoal ColorsClearedGoal TimeTiers HexaSortRules CascadeTransferResolver ExistingToPlacedPolicy Transfer StackTransferred StackCompleted SortGoalScoring SortLevelBuilder HexaSortFactory MergeTile Slide MergeState HexaMergeRules TileSpawner TargetReached TilesMerged MergeSumScoring HexaMergeFactory
+%% layer:varext ILevelGoal ITransferDirectionPolicy
+%% layer:application UseCase LoggingUseCase StartGameUseCase ApplyMoveUseCase UndoMoveUseCase RedoMoveUseCase LoadLevelsUseCase SaveProgressUseCase SyncProgressUseCase SyncLeaderboardUseCase GetLeaderboardUseCase LoginUseCase RegisterUseCase ProgressKind GameCatalog GameSession SessionState MenuState PlayingState ResolvingState PausedState GameOverState VictoryState IProgressRepository ILevelSource IProgressGateway ILeaderboardGateway IScoreQueue QueuedScore ScoreEntry IAuthGateway ISessionStore ISeedProvider IClock ILogger
+%% layer:extapp GameModule ILevelParser
+%% layer:adapter DriftProgressRepository DriftScoreQueue AppDatabase AssetLevelSource RemoteLevelSource FallbackLevelSource SortLevelParser DioApiGateway ProblemJsonMapper LocalSessionStore SecureSeedProvider StopwatchClock DebugLogger HexaLinesModule HexaSortModule HexaMergeModule HexBoardView GameScreen BoardGesture GestureKind LinesMoveInput SortMoveInput MergeMoveInput LinesCellRenderer SortCellRenderer MergeCellRenderer GameViewModel GameServiceFacade AudioManager AppProviders
+%% layer:extadp IGameUiModule IMoveInput CellRenderer
+
+  %% ---- colores por capa ----
+  style HexCoord fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style HexDirection fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style HexGeometry fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style HexAxis fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style BoardShape fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style HexagonShape fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style HexBoard fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style Piece fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style AbstractGameRules fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style TurnResult fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style GameEvent fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style MoveRejected fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style ScoreChanged fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style GameEnded fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style GoalReached fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style GameOutcome fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style GameEngine fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style UndoableGameEngine fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style MoveCommand fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style MoveHistory fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style IUndoable fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style Score fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style BonusMultiplierDecorator fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style SeededRandomPieceSource fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style IRandom fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style SeededRandom fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style Mergeable fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style SlideMergeResolver fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style GameResult fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style HighScoreProgress fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style LevelProgress fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style TileColor fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style ILevelBuilder fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style GameSetup fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style GameState fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IGameRules fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IRedoable fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IScoringPolicy fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IPieceSource fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IProgressModel fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style GameVariantFactory fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style PlacePiece fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style LinesState fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style HexaLinesRules fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style LineClearResolver fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style LinesCleared fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style PolyhexCatalog fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style LinesComboScoring fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style LinesStreakBonus fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style HexaLinesFactory fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style ColorStack fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style PlaceStack fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style SortState fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style ScoreGoal fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style ColorsClearedGoal fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style TimeTiers fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style HexaSortRules fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style CascadeTransferResolver fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style ExistingToPlacedPolicy fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style Transfer fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style StackTransferred fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style StackCompleted fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style SortGoalScoring fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style SortLevelBuilder fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style HexaSortFactory fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style MergeTile fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style Slide fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style MergeState fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style HexaMergeRules fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style TileSpawner fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style TargetReached fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style TilesMerged fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style MergeSumScoring fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style HexaMergeFactory fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style ILevelGoal fill:#FEF5F4,stroke:#E67E22,stroke-width:4px,stroke-dasharray:5 3,color:#1B1B1B
+  style ITransferDirectionPolicy fill:#FEF5F4,stroke:#E67E22,stroke-width:4px,stroke-dasharray:5 3,color:#1B1B1B
+  style UseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style LoggingUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style StartGameUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ApplyMoveUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style UndoMoveUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style RedoMoveUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style LoadLevelsUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style SaveProgressUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style SyncProgressUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style SyncLeaderboardUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style GetLeaderboardUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style LoginUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style RegisterUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ProgressKind fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style GameCatalog fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style GameSession fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style SessionState fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style MenuState fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style PlayingState fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ResolvingState fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style PausedState fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style GameOverState fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style VictoryState fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style IProgressRepository fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ILevelSource fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style IProgressGateway fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ILeaderboardGateway fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style IScoreQueue fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style QueuedScore fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ScoreEntry fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style IAuthGateway fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ISessionStore fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ISeedProvider fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style IClock fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ILogger fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style GameModule fill:#FCF3CF,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style ILevelParser fill:#FCF3CF,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style DriftProgressRepository fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style DriftScoreQueue fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style AppDatabase fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style AssetLevelSource fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style RemoteLevelSource fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style FallbackLevelSource fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style SortLevelParser fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style DioApiGateway fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style ProblemJsonMapper fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style LocalSessionStore fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style SecureSeedProvider fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style StopwatchClock fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style DebugLogger fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style HexaLinesModule fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style HexaSortModule fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style HexaMergeModule fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style HexBoardView fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style GameScreen fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style BoardGesture fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style GestureKind fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style LinesMoveInput fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style SortMoveInput fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style MergeMoveInput fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style LinesCellRenderer fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style SortCellRenderer fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style MergeCellRenderer fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style GameViewModel fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style GameServiceFacade fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style AudioManager fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style AppProviders fill:#D5F5E3,stroke:#1E8449,color:#1B1B1B
+  style IGameUiModule fill:#D5F5E3,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style IMoveInput fill:#D5F5E3,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style CellRenderer fill:#D5F5E3,stroke:#E67E22,stroke-width:4px,color:#1B1B1B

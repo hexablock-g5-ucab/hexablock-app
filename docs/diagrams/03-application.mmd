@@ -1,5 +1,5 @@
 ---
-title: "HexaBlock Suite · Modelo de clases v5 (3/5) — Casos de uso, puertos, AOP y estado de sesión · packages/hexa_application"
+title: "HexaBlock Suite · Modelo de clases v6.3 (3/5) — Casos de uso, puertos, AOP y estado de sesión · packages/hexa_application"
 config:
   layout: elk
   theme: base
@@ -28,6 +28,12 @@ classDiagram
   class IProgressModel {
     <<interface · Strategy>>
   }
+  class IRedoable {
+    <<interface · capacidad ISP>>
+  }
+  class GoalReached {
+    <<evento base del núcleo>>
+  }
 
   %% ===================== CONTRATO DE CASO DE USO + AOP =====================
   class UseCase~I, O~ {
@@ -36,7 +42,7 @@ classDiagram
   }
   class LoggingUseCase~I, O~ {
     <<AOP · Decorator>>
-    -inner: UseCase~I, O~
+    -inner: UseCase‹I, O›
     -log: ILogger
   }
 
@@ -44,7 +50,6 @@ classDiagram
   class StartGameUseCase {
     -catalog: GameCatalog
     -seeds: ISeedProvider
-    -saved: ISavedGameStore
     +execute(r: StartGameRequest) Future~GameSession~
   }
   class ApplyMoveUseCase {
@@ -53,6 +58,9 @@ classDiagram
   class UndoMoveUseCase {
     +execute(s: GameSession) Future~MoveResult~
   }
+  class RedoMoveUseCase {
+    +execute(s: GameSession) Future~MoveResult~  (solo si el motor es IRedoable)
+  }
   class LoadLevelsUseCase {
     -levels: ILevelSource
     +execute(game: String) Future~List‹LevelSummary›~
@@ -60,6 +68,7 @@ classDiagram
   class SaveProgressUseCase {
     -repo: IProgressRepository
     -catalog: GameCatalog — pide el IProgressModel del juego
+    -scores: IScoreQueue — encola el ScoreEntry de la partida
     +execute(r: GameResult) Future~void~
   }
   class SyncProgressUseCase {
@@ -68,9 +77,9 @@ classDiagram
     +execute(game: String) Future~Progress~
   }
   class SyncLeaderboardUseCase {
-    -repo: IProgressRepository
+    -queue: IScoreQueue
     -gateway: ILeaderboardGateway
-    +execute(game: String) Future~void~  (envía puntajes pendientes)
+    +execute(game: String) Future~void~  (envía los pendientes del juego y los marca)
   }
   class GetLeaderboardUseCase {
     -gateway: ILeaderboardGateway
@@ -92,10 +101,20 @@ classDiagram
     +progressKind: ProgressKind
     +createSession(setup: GameSetup) GameSession‹…›  (genéricos cerrados aquí)
     +createProgressModel() IProgressModel
+    +levelParser: ILevelParser? — null en juegos sin niveles
+  }
+  class ProgressKind {
+    <<enumeration>>
+    highScore
+    levels
+  }
+  class ILevelParser {
+    <<interface · puerto · punto de extensión>>
+    +parse(json: Map) GameSetup
   }
   class GameCatalog {
     <<registro · OCP>>
-    -modules: Map~String, GameModule~
+    -modules: Map‹String, GameModule›
     +register(m: GameModule) void
     +byId(id: String) GameModule
     +all() List~GameModule~
@@ -103,13 +122,14 @@ classDiagram
   class GameSession~TCell, TMove, TState~ {
     <<State (contexto)>>
     -state: SessionState
-    +engine: GameEngine~TCell, TMove, TState~
+    +engine: GameEngine‹TCell, TMove, TState›
     +start() void  (MenuState → PlayingState)
     +move(m: TMove) TurnResult~TState~  (PlayingState → ResolvingState)
     +finishResolving() void  (→ PlayingState, GameOverState o VictoryState)
+    +continuePlaying() void  (VictoryState → PlayingState si la partida sigue)
     +pause() void
     +resume() void
-    +reconcileAfterUndo() void
+    +reconcileAfterHistoryChange() void  (tras deshacer o rehacer)
     +events: Stream~GameEvent~
   }
   class SessionState {
@@ -123,18 +143,15 @@ classDiagram
   class ResolvingState
   class PausedState
   class GameOverState
-  class VictoryState
+  class VictoryState {
+    +onContinue(ctx) void — sólo si el motor sigue en ongoing
+  }
 
   %% ===================== PUERTOS DE SALIDA =====================
   class IProgressRepository {
     <<interface · puerto>>
     +load(game: String) Future~Progress~
     +save(p: Progress) Future~void~
-  }
-  class ISavedGameStore {
-    <<interface · puerto>>
-    +load(game: String) Future~String?~
-    +save(game: String, json: String) Future~void~
   }
   class ILevelSource {
     <<interface · puerto>>
@@ -149,6 +166,25 @@ classDiagram
     +submit(s: ScoreEntry) Future~void~
     +top(q: LeaderboardQuery) Future~Leaderboard~
   }
+  class IScoreQueue {
+    <<interface · puerto>>
+    +enqueue(s: ScoreEntry) Future~void~
+    +pending(game: String) Future~List‹QueuedScore›~
+    +markSent(ids: List‹int›) Future~void~
+  }
+  class QueuedScore {
+    <<inmutable>>
+    +id: int — id local de la cola
+    +entry: ScoreEntry
+  }
+  class ScoreEntry {
+    <<inmutable · sale de GameResult>>
+    +gameId: String
+    +levelId: String?
+    +score: int
+    +moves: int
+    +elapsedMs: int
+  }
   class IAuthGateway {
     <<interface · puerto>>
     +login(email, password) Future~Session~
@@ -160,14 +196,13 @@ classDiagram
     +save(s: Session) Future~void~
     +clear() Future~void~
   }
-  class IStateSerializer~TState~ {
-    <<interface · puerto · Mapper>>
-    +toJson(s: TState) String
-    +fromJson(json: String) TState
-  }
   class ISeedProvider {
     <<interface · puerto>>
     +newSeed() int
+  }
+  class IClock {
+    <<interface · puerto>>
+    +elapsed() Duration — tiempo de la partida en curso
   }
   class ILogger {
     <<interface · puerto>>
@@ -184,6 +219,7 @@ classDiagram
   StartGameUseCase ..|> UseCase
   ApplyMoveUseCase ..|> UseCase
   UndoMoveUseCase ..|> UseCase
+  RedoMoveUseCase ..|> UseCase
   LoadLevelsUseCase ..|> UseCase
   SaveProgressUseCase ..|> UseCase
   SyncProgressUseCase ..|> UseCase
@@ -194,26 +230,32 @@ classDiagram
 
   StartGameUseCase --> GameCatalog
   StartGameUseCase --> ISeedProvider
-  StartGameUseCase --> ISavedGameStore
   ApplyMoveUseCase ..> GameSession : move()
   UndoMoveUseCase ..> GameSession : recupera engine y actualiza fase
   UndoMoveUseCase ..> IUndoable : capacidad del motor de la sesión
+  RedoMoveUseCase ..> GameSession : recupera engine y actualiza fase
+  RedoMoveUseCase ..> IRedoable : capacidad del motor de la sesión
   LoadLevelsUseCase --> ILevelSource
   SaveProgressUseCase --> IProgressRepository
   SaveProgressUseCase --> GameCatalog
+  SaveProgressUseCase --> IScoreQueue : enqueue
   SyncProgressUseCase --> IProgressRepository
   SyncProgressUseCase --> IProgressGateway
-  SyncLeaderboardUseCase --> IProgressRepository
+  SyncLeaderboardUseCase --> IScoreQueue : pending · markSent
+  IScoreQueue ..> QueuedScore
+  QueuedScore --> ScoreEntry
   SyncLeaderboardUseCase --> ILeaderboardGateway
   GetLeaderboardUseCase --> ILeaderboardGateway
+  ILeaderboardGateway ..> ScoreEntry : envía
   LoginUseCase --> IAuthGateway
   LoginUseCase --> ISessionStore
   RegisterUseCase --> IAuthGateway
 
   GameCatalog o-- "3..*" GameModule
   GameModule ..> GameVariantFactory : usa
-  GameModule ..> IStateSerializer : usa
   GameModule ..> GameSession : «create»
+  GameModule --> ProgressKind
+  GameModule --> "0..1" ILevelParser : levelParser
   GameSession --> "1" SessionState : state
   GameSession --> "1" GameEngine : engine
   GameModule ..> IProgressModel : «create» vía su factory
@@ -224,8 +266,12 @@ classDiagram
   PausedState ..|> SessionState
   GameOverState ..|> SessionState
   VictoryState ..|> SessionState
+  ResolvingState ..> GoalReached : si llega y el motor sigue → VictoryState
 
-  note for GameModule "Borde no genérico: el selector y las rutas sólo ven<br>GameModule; los genéricos quedan cerrados dentro de<br>cada módulo. Una 5.ª variante = 1 módulo + 1 línea<br>en el catálogo."
+  note for GameModule "Borde no genérico y Dart puro: el selector y las<br>rutas sólo ven GameModule; los genéricos quedan<br>cerrados dentro de cada módulo. Lo visual del juego<br>va aparte, en IGameUiModule (vista 4), para que esta<br>capa no dependa de Flutter. Una variante nueva =<br>1 módulo + 1 línea en el catálogo."
+  note for IScoreQueue "Sin red, los puntajes esperan aquí. Al sincronizar<br>se envían los del juego y se marcan con su id<br>local: reintentar nunca duplica ni pierde puntajes."
+  note for ILevelParser "Solo lo tienen los juegos por niveles (hoy, Sort).<br>Los orígenes de niveles lo piden al catálogo por<br>gameId: una variante nueva con niveles trae su<br>parser y no se modifican."
+  note for VictoryState "Con GoalReached (en Merge, TargetReached al llegar<br>a 2048) se muestra la victoria, pero el motor sigue<br>en ongoing y el jugador puede continuar. Con<br>GameEnded(victory), como en Sort, termina el nivel."
   note for LoggingUseCase "AOP sin librerías: el composition root envuelve<br>ApplyMoveUseCase (genérico) una sola vez y el<br>aspecto cubre las 3 variantes: registra nombre, resultado y duración<br>sin registrar credenciales ni datos personales."
 
   %% ===================== LEYENDA =====================
@@ -240,10 +286,11 @@ classDiagram
 %% layer:adapter LEG3
 %% layer:extension LEG5
 
-%% layer:domain GameEngine IUndoable GameEvent IProgressModel
+%% layer:domain GameEngine IUndoable GameEvent IProgressModel GoalReached
+%% layer:extension IRedoable
 %% layer:extension GameVariantFactory
-%% layer:application UseCase LoggingUseCase StartGameUseCase ApplyMoveUseCase UndoMoveUseCase LoadLevelsUseCase SaveProgressUseCase SyncProgressUseCase SyncLeaderboardUseCase GetLeaderboardUseCase LoginUseCase RegisterUseCase GameCatalog GameSession SessionState MenuState PlayingState ResolvingState PausedState GameOverState VictoryState IProgressRepository ISavedGameStore ILevelSource IProgressGateway ILeaderboardGateway IAuthGateway ISessionStore ISeedProvider ILogger
-%% layer:extapp GameModule IStateSerializer
+%% layer:application UseCase LoggingUseCase StartGameUseCase ApplyMoveUseCase UndoMoveUseCase RedoMoveUseCase LoadLevelsUseCase SaveProgressUseCase SyncProgressUseCase SyncLeaderboardUseCase GetLeaderboardUseCase LoginUseCase RegisterUseCase GameCatalog GameSession SessionState MenuState PlayingState ResolvingState PausedState GameOverState VictoryState IProgressRepository ILevelSource IProgressGateway ILeaderboardGateway IAuthGateway ISessionStore ISeedProvider IClock ILogger ScoreEntry ProgressKind IScoreQueue QueuedScore
+%% layer:extapp GameModule ILevelParser
 
   %% ---- colores por capa ----
   style LEG1 fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
@@ -255,12 +302,15 @@ classDiagram
   style IUndoable fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
   style GameEvent fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
   style IProgressModel fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style GoalReached fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
+  style IRedoable fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
   style GameVariantFactory fill:#FADBD8,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
   style UseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style LoggingUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style StartGameUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style ApplyMoveUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style UndoMoveUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style RedoMoveUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style LoadLevelsUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style SaveProgressUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style SyncProgressUseCase fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
@@ -278,13 +328,17 @@ classDiagram
   style GameOverState fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style VictoryState fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style IProgressRepository fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
-  style ISavedGameStore fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style ILevelSource fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style IProgressGateway fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style ILeaderboardGateway fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style IAuthGateway fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style ISessionStore fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style ISeedProvider fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style IClock fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style ILogger fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ScoreEntry fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style ProgressKind fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style IScoreQueue fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
+  style QueuedScore fill:#FCF3CF,stroke:#B7950B,color:#1B1B1B
   style GameModule fill:#FCF3CF,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
-  style IStateSerializer fill:#FCF3CF,stroke:#E67E22,stroke-width:4px,color:#1B1B1B
+  style ILevelParser fill:#FCF3CF,stroke:#E67E22,stroke-width:4px,color:#1B1B1B

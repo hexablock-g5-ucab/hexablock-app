@@ -1,5 +1,5 @@
 ---
-title: "HexaBlock Suite · Modelo de clases v5 (2a/5) — Hexa Lines instancia el motor · hexa_engine/lib/src/variants/lines"
+title: "HexaBlock Suite · Modelo de clases v6.3 (2a/5) — Hexa Lines instancia el motor · hexa_engine/lib/src/variants/lines"
 config:
   layout: elk
   theme: base
@@ -49,20 +49,21 @@ classDiagram
     <<TMove · inmutable>>
     +trayIndex: int
     +anchor: HexCoord
+    +rotation: int — 0 a 5 pasos de 60°
   }
   class LinesState {
     <<TState · inmutable>>
     +board: HexBoard~TileColor~
-    +tray: List~Piece‹TileColor›?~
-    +streak: int
+    +tray: List~Piece‹TileColor›?~ — 3; se repone al colocar las 3
+    +streak: int — turnos seguidos limpiando líneas
   }
   class HexaLinesRules {
     -clear: LineClearResolver
     -pieces: IPieceSource~Piece‹TileColor›~
-    #apply(...) LinesState  (coloca la pieza)
+    #apply(...) LinesState  (rota con Piece.rotated y coloca)
     #resolve(...) LinesState  (borra líneas llenas)
-    #afterResolve(...) LinesState  (rellena bandeja)
-    +evaluate(s) GameOutcome  (derrota si ninguna pieza cabe)
+    #afterResolve(...) LinesState  (actualiza racha; repone bandeja vacía)
+    +evaluate(s) GameOutcome  (derrota si ninguna pieza cabe en ninguna rotación)
   }
   class LineClearResolver {
     <<Strategy>>
@@ -76,10 +77,17 @@ classDiagram
   }
   class PolyhexCatalog {
     <<datos>>
-    +pieces: List~Piece‹TileColor›~ — 1–5 celdas, con pesos
+    +pieces: List~Piece‹TileColor›~ — 1–5 celdas, misma probabilidad
   }
   class LinesComboScoring {
+    -perCell: int = 10
+    -comboFactor: double = 1.5 — por cada línea extra del mismo turno
     +pointsFor(before, after, events) int
+  }
+  class LinesStreakBonus {
+    <<Decorator>>
+    -inner: IScoringPolicy~LinesState~
+    +pointsFor(before, after, events) int — racha 4 ×2 · 5 ×4 · desde 6 ×5
   }
   class HexaLinesFactory {
     <<Abstract Factory (concreta)>>
@@ -97,11 +105,15 @@ classDiagram
   HexaLinesFactory ..> SeededRandomPieceSource : «create»
   HexaLinesFactory ..> HexaLinesRules : «create»
   HexaLinesFactory ..> LinesComboScoring : «create»
+  LinesStreakBonus ..|> IScoringPolicy : «bind» TState→LinesState
+  LinesStreakBonus o-- "1" LinesComboScoring : inner
+  HexaLinesFactory ..> LinesStreakBonus : «create» envuelve la puntuación base
   HexaLinesFactory ..> HighScoreProgress : «create»
   LinesState --> "0..3" Piece : tray
   LinesCleared --|> GameEvent
   LineClearResolver ..> LinesCleared : emite
-  note for HexaLinesRules "No implementa IUndoable (ISP): Lines<br>no tiene deshacer; sólo Merge lo tiene.<br>27 líneas = 9 por eje en radio 4."
+  note for HexaLinesRules "No implementa IUndoable (ISP): Lines<br>no tiene deshacer; sólo Merge lo tiene.<br>27 líneas = 9 por eje en radio 4. Se borran<br>todas las líneas completas a la vez, sin importar<br>el color; la celda de un cruce se borra una vez."
+  note for LinesStreakBonus "La racha cuenta turnos seguidos que limpian<br>líneas y se corta con una pieza que no limpia nada.<br>El multiplicador empieza en el 4.º turno seguido."
 
   %% ===================== LEYENDA =====================
   class LEG1["Capa 1 · Entidades — núcleo genérico (hexa_engine/core)"]
@@ -117,7 +129,7 @@ classDiagram
 
 %% layer:extension AbstractGameRules GameState IScoringPolicy IPieceSource GameVariantFactory
 %% layer:domain SeededRandomPieceSource HighScoreProgress Piece TileColor HexagonShape GameEvent
-%% layer:variant PlacePiece LinesState HexaLinesRules LineClearResolver PolyhexCatalog LinesComboScoring HexaLinesFactory LinesCleared
+%% layer:variant PlacePiece LinesState HexaLinesRules LineClearResolver PolyhexCatalog LinesComboScoring HexaLinesFactory LinesCleared LinesStreakBonus
 
   %% ---- colores por capa ----
   style LEG1 fill:#FADBD8,stroke:#B03A2E,color:#1B1B1B
@@ -144,3 +156,4 @@ classDiagram
   style LinesComboScoring fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
   style HexaLinesFactory fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
   style LinesCleared fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B
+  style LinesStreakBonus fill:#FEF5F4,stroke:#C0392B,stroke-dasharray:5 3,color:#1B1B1B

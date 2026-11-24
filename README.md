@@ -39,9 +39,25 @@ An absent board entry represents an empty cell, so `TCell extends Object`. The b
 
 ## Class model
 
+The complete client model in one picture (model v6.3): the four Clean Architecture layers, the generic engine and
+the three variants. Colours mark the layer: red = Entities (`hexa_engine`, dashed border = variants),
+yellow = Use cases (`hexa_application`), green = Interface adapters (`hexa_infrastructure`, `app`),
+blue = Frameworks. An orange border marks an extension point.
+
+[![Class diagram of hexablock-app](docs/diagrams/class-diagram-app.png)](docs/diagrams/class-diagram-app.svg)
+
+Click the image for the zoomable SVG. Source: [`class-diagram-app.mmd`](docs/diagrams/class-diagram-app.mmd).
+The backend model lives in [hexablock-api](https://github.com/hexablock-g5-ucab/hexablock-api#architecture-and-class-model).
+
+The same model split by area, easier to read:
+
+<details><summary>Core contract overview</summary>
+
 ![Core contract overview](docs/diagrams/00-overview.png)
 
 [Editable overview](docs/diagrams/00-overview.mmd)
+
+</details>
 
 <details><summary>Engine and geometry in detail</summary>
 
