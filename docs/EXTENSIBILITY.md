@@ -1,6 +1,6 @@
 # Adding a variant to the shared engine
 
-The [v5 source views](diagrams/README.md) define the target contracts. Use Hexa Fill, a cell-painting puzzle, to rehearse the extension exercise. This is a design walkthrough for an additional game.
+The [layered class model](diagrams/README.md) define the target contracts. Use Hexa Fill, a cell-painting puzzle, to rehearse the extension exercise. This is a design walkthrough for an additional game.
 
 1. Specify allowed paints, a rejected move, scoring, victory and how to persist progress. Make one small example board for each outcome.
 2. In `packages/hexa_engine/lib/src/variants/fill/` introduce FillCell, PaintCell and FillState. FillState implements `GameState<FillCell>`. Implement `AbstractGameRules<FillCell, PaintCell, FillState>` and a scoring policy.

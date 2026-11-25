@@ -1,5 +1,10 @@
 # Handoff
 
+## Current design reference
+
+Use the [interactive model and PDF](diagrams/README.md) for UC-001. The proposed use-case contract represents expected failures with Result. The merged logging decorator still uses `Future<O>` and exceptions.
+
+
 ## Role C · 2026-11-24
 
 The first v6.3 application contracts are exported by `package:hexa_application/hexa_application.dart`.
