@@ -139,7 +139,9 @@ await tracedMove.execute(request);
 
 The [decorator](packages/hexa_application/lib/src/aspects/logging_use_case.dart) records entry, outcome
 and elapsed milliseconds through an injected [ILogger](packages/hexa_application/lib/src/ports/logger.dart)
-port. It forwards the original result or exception. Request values, results and exception messages
+port. Each call returns a `Future<Result<O, AppFailure>>`. A returned `Failure` is logged as a
+failed outcome and forwarded unchanged. Unexpected exceptions are logged by type and rethrown
+with their original stack trace. Request values, results and exception messages
 stay out of the log. The first gameplay use case can reuse this wrapper when wired into the app.
 [Application tests](packages/hexa_application/test/logging_use_case_test.dart) exercise the public package API.
 
