@@ -41,7 +41,7 @@ An absent board entry represents an empty cell, so `TCell extends Object`. The b
 
 The four-layer design covers 178 classes and 384 relationships. Yellow identifies domain classes, purple application, green interfaces and blue infrastructure.
 
-[![Class diagram detail. Open the full PDF](docs/diagrams/class-diagram-app-preview.png)](docs/diagrams/class-diagram-app.pdf)
+[![Complete layered class diagram. Open the vector PDF](docs/diagrams/class-diagram-app-preview.png)](docs/diagrams/class-diagram-app.pdf)
 
 **[Open the complete class diagram (PDF)](docs/diagrams/class-diagram-app.pdf)** · [Interactive HTML](docs/diagrams/class-diagram-app.html) · [Model guide](docs/diagrams/README.md)
 
@@ -73,7 +73,9 @@ await tracedMove.execute(request);
 
 The [decorator](packages/hexa_application/lib/src/aspects/logging_use_case.dart) records entry, outcome
 and elapsed milliseconds through an injected [ILogger](packages/hexa_application/lib/src/ports/logger.dart)
-port. It forwards the original result or exception. Request values, results and exception messages
+port. Each call returns a `Future<Result<O, AppFailure>>`. A returned `Failure` is logged as a
+failed outcome and forwarded unchanged. Unexpected exceptions are logged by type and rethrown
+with their original stack trace. Request values, results and exception messages
 stay out of the log. The first gameplay use case can reuse this wrapper when wired into the app.
 [Application tests](packages/hexa_application/test/logging_use_case_test.dart) exercise the public package API.
 

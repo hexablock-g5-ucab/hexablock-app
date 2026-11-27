@@ -2,7 +2,7 @@
 
 ## Current design reference
 
-Use the [interactive model and PDF](diagrams/README.md) for UC-001. The proposed use-case contract represents expected failures with Result. The merged logging decorator still uses `Future<O>` and exceptions.
+Use the [interactive model and PDF](diagrams/README.md) for UC-001. The merged logging decorator supports typed Result outcomes and preserves unexpected exceptions.
 
 
 ## Role C · 2026-11-24
@@ -22,3 +22,9 @@ Updated in the PR that closes each phase (template: `harness/templates/handoff_u
 ## Design baseline · 2026-11-20
 
 See the [class model](diagrams/README.md), [assessment scope](specs/requirements.md) and [AI-003](ai-log/AI-003.md). Review this documentation alongside the bootstrap PR. The next behaviour change starts with team approval of UC-001 and fixed-seed Merge replay tests.
+
+## Role C · typed outcomes · 2026-11-25
+
+Implement new application operations with `Future<Result<O, AppFailure>>`. Return a `Failure` for
+an expected application rejection; let unexpected exceptions propagate. The decorator handles
+both outcomes. Concrete gameplay and optional lookups are separate increments.
