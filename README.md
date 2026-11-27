@@ -27,6 +27,8 @@ The engine owns geometry and game rules. Application use cases coordinate sessio
 
 [Editable source](docs/diagrams/clean-architecture.mmd)
 
+[Hexa Lines placement and acceptance examples](docs/specs/use-cases/UC-002-lines-placement.md)
+
 ## Generic engine
 
 | Variant | Cell | Move | State | Piece source produces |

@@ -26,6 +26,7 @@ Record additional tools when they are actually used. If the interface does not i
 | [AI-004](docs/ai-log/AI-004.md) | 2026-11-23 | Design baseline v6.3 | Claude Opus 5.5, reviewed with Gemini | Class model v6.3 and complete README diagram | [Model](docs/diagrams/README.md) | N/A (documentation) |
 | [AI-005](docs/ai-log/AI-005.md) | 2026-11-24 | Role C / NFR-006 | OpenAI Codex | Implement and test application logging | hexa_application | ~100% of new product code |
 | [AI-008](docs/ai-log/AI-008.md) | 2026-11-25 | Role C / NFR-006 | OpenAI Codex | Typed use-case outcomes and logging | hexa_application | ~100% of changed product code |
+| [AI-009](docs/ai-log/AI-009.md) | 2026-11-27 | UC-002 / FR-004 | OpenAI Codex | Define Lines placement and acceptance scenarios | AI-009 | N/A (documentation) |
 
 ## Entry template (copy to `docs/ai-log/AI-xxx.md`)
 
