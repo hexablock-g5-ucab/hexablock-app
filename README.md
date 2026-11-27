@@ -6,7 +6,7 @@
 
 HexaBlock is a Flutter puzzle suite designed around one hexagonal board and turn engine. **Lines** clears rows on three axes, **Sort** transfers coloured chips between stacks, and **Merge** slides number tiles in six directions.
 
-**Development status.** The Flutter starter, Dart workspace, architecture check and CI workflows are in place. The class model describes the implementation target. Screenshots and playable demos will accompany the corresponding game features. [Assessment scope](docs/specs/requirements.md) · [Backend](https://github.com/hexablock-g5-ucab/hexablock-api)
+**Development status.** The game selector opens the Lines guide. Sort and Merge are listed as upcoming. Gameplay and settings are separate increments. [Assessment scope](docs/specs/requirements.md) · [Backend](https://github.com/hexablock-g5-ucab/hexablock-api)
 
 ## Getting started
 
