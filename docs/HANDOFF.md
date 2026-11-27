@@ -1,5 +1,10 @@
 # Handoff
 
+## Current design reference
+
+Use the [interactive model and PDF](diagrams/README.md) for UC-001. The merged logging decorator supports typed Result outcomes and preserves unexpected exceptions.
+
+
 ## Role C · 2026-11-24
 
 The first v6.3 application contracts are exported by `package:hexa_application/hexa_application.dart`.

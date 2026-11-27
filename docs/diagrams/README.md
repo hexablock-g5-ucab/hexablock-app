@@ -1,32 +1,17 @@
-# Class model v6.3
+# App class model
 
-The model is frozen at v6.3. It is the implementation baseline for Lines, Sort and Merge and builds on the team's v5 views.
-The Mermaid sources can be edited. The draw.io file in this directory is the historical v0.
+The four-layer design covers 178 classes and 384 relationships. Yellow identifies domain classes, purple application, green interfaces and blue infrastructure.
 
-- **Complete client model:** all layers in one picture. [Image](class-diagram-app.png) · [Zoomable SVG](class-diagram-app.svg) · [Editable source](class-diagram-app.mmd)
-- **Overview:** [Image](00-overview.png) · [Editable source](00-overview.mmd)
-- **Generic engine and geometry:** [Image](01-core.png) · [Editable source](01-core.mmd)
-- **Hexa Lines:** [Image](02a-lines.png) · [Editable source](02a-lines.mmd)
-- **Hexa Sort:** [Image](02b-sort.png) · [Editable source](02b-sort.mmd)
-- **Hexa Merge:** [Image](02c-merge.png) · [Editable source](02c-merge.mmd)
-- **Sessions, use cases and ports:** [Image](03-application.png) · [Editable source](03-application.mmd)
-- **Adapters, modules and presentation:** [Image](04-adapters.png) · [Editable source](04-adapters.mmd)
+[Interactive HTML](class-diagram-app.html) · [Vector PDF](class-diagram-app.pdf)
 
-The backend model lives in [hexablock-api](https://github.com/hexablock-g5-ucab/hexablock-api/blob/develop/docs/diagrams/README.md).
+Download the HTML from GitHub and open it locally to search classes, inspect members and follow relationships. The first PDF page contains the whole model; the following pages index relationships by source class.
 
-## Reading the model
+[Companion api model](https://github.com/hexablock-g5-ucab/hexablock-api/blob/develop/docs/diagrams/README.md)
 
-**Notation and colours**
-- Solid triangles mean inheritance. Dashed triangles mean an interface is implemented.
-- Filled diamonds mean composition. Hollow diamonds mean aggregation.
-- Colours mark the Clean Architecture layer:
-  - red: Entities (dashed border = variants);
-  - yellow: Use cases;
-  - green: Interface adapters;
-  - blue: Frameworks.
-- An orange border marks an extension point.
+## Design contracts
 
 **Engine**
+
 - Factories preserve `TPiece` from the source to the rules.
 - Axial coordinates use the same q and r values for equality and hashing.
 - Moves are validated before consuming randomness or replacing the undo history.
@@ -68,17 +53,3 @@ The backend model lives in [hexablock-api](https://github.com/hexablock-g5-ucab/
 
 - **Clean Architecture:** [Image](clean-architecture.png) · [Editable source](clean-architecture.mmd)
 - **Extension points:** [Image](extensibility.png) · [Editable source](extensibility.mmd)
-
-## Regenerating
-
-From this directory, for example:
-
-```sh
-mmdc -i 01-core.mmd -o 01-core.png -w 2400 -s 2 -b white
-```
-
-The complete model is larger than Mermaid's default text limit, so render it with the bundled config:
-
-```sh
-mmdc -i class-diagram-app.mmd -o class-diagram-app.svg -b white -c mmd-config.json
-```

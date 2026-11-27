@@ -1,37 +1,6 @@
 # Entity Model (glossary)
 
-```mermaid
-classDiagram
-  class HexCoord {
-    +q: int
-    +r: int
-  }
-  class HexBoard~TCell~ {
-    +shape
-    +cells
-  }
-  class Piece~TCell~ {
-    +cells
-  }
-  class GameState~TCell~ {
-    +board
-  }
-  class Level {
-    +levelId
-    +gameId
-    +order
-    +board
-    +spec
-  }
-  class Progress {
-    +gameId
-    +bestScore
-    +stars
-  }
-  HexBoard --> HexCoord
-  GameState --> HexBoard
-  Level --> GameState : configures a Sort session
-```
+See the [complete class model](../diagrams/README.md) for types, members and relationships.
 
 | Term | Meaning |
 | --- | --- |

@@ -39,83 +39,17 @@ An absent board entry represents an empty cell, so `TCell extends Object`. The b
 
 ## Class model
 
-The complete client model in one picture (model v6.3): the four Clean Architecture layers, the generic engine and
-the three variants. Colours mark the layer: red = Entities (`hexa_engine`, dashed border = variants),
-yellow = Use cases (`hexa_application`), green = Interface adapters (`hexa_infrastructure`, `app`),
-blue = Frameworks. An orange border marks an extension point.
+The four-layer design covers 178 classes and 384 relationships. Yellow identifies domain classes, purple application, green interfaces and blue infrastructure.
 
-[![Class diagram of hexablock-app](docs/diagrams/class-diagram-app.png)](docs/diagrams/class-diagram-app.svg)
+[![Complete layered class diagram. Open the vector PDF](docs/diagrams/class-diagram-app-preview.png)](docs/diagrams/class-diagram-app.pdf)
 
-Click the image for the zoomable SVG. Source: [`class-diagram-app.mmd`](docs/diagrams/class-diagram-app.mmd).
-The backend model lives in [hexablock-api](https://github.com/hexablock-g5-ucab/hexablock-api#architecture-and-class-model).
+**[Open the complete class diagram (PDF)](docs/diagrams/class-diagram-app.pdf)** · [Interactive HTML](docs/diagrams/class-diagram-app.html) · [Model guide](docs/diagrams/README.md)
 
-The same model split by area, easier to read:
-
-<details><summary>Core contract overview</summary>
-
-![Core contract overview](docs/diagrams/00-overview.png)
-
-[Editable overview](docs/diagrams/00-overview.mmd)
-
-</details>
-
-<details><summary>Engine and geometry in detail</summary>
-
-![Generic engine and geometry](docs/diagrams/01-core.png)
-
-[Editable source](docs/diagrams/01-core.mmd)
-
-</details>
-
-<details><summary>Hexa Lines</summary>
-
-![Hexa Lines](docs/diagrams/02a-lines.png)
-
-[Editable source](docs/diagrams/02a-lines.mmd)
-
-</details>
-
-<details><summary>Hexa Sort</summary>
-
-![Hexa Sort](docs/diagrams/02b-sort.png)
-
-[Editable source](docs/diagrams/02b-sort.mmd)
-
-</details>
-
-<details><summary>Hexa Merge</summary>
-
-![Hexa Merge](docs/diagrams/02c-merge.png)
-
-[Editable source](docs/diagrams/02c-merge.mmd)
-
-</details>
-
-<details><summary>Sessions, use cases and ports</summary>
-
-![Sessions, use cases and ports](docs/diagrams/03-application.png)
-
-[Editable source](docs/diagrams/03-application.mmd)
-
-</details>
-
-<details><summary>Adapters, modules and presentation</summary>
-
-![Adapters, modules and presentation](docs/diagrams/04-adapters.png)
-
-[Editable source](docs/diagrams/04-adapters.mmd)
-
-</details>
-
-[Design decisions and model index](docs/diagrams/README.md)
-
-![Extension points for an additional variant](docs/diagrams/extensibility.png)
-
-[Editable source](docs/diagrams/extensibility.mmd)
+Download the HTML from GitHub and open it locally to search classes, inspect members and follow relationships. The first PDF page contains the whole model; the following pages index relationships by source class.
 
 ## Design patterns, SOLID and AOP
 
-Abstract Factory assembles compatible families. Strategy selects rules and scoring. Template Method defines a common turn sequence. Observer distributes game events. Command records the last accepted Merge move. A Decorator around the use case records operation, outcome and duration. The [class views](docs/diagrams/README.md) identify the participants.
+Abstract Factory assembles compatible families. Strategy selects rules and scoring. Template Method defines a common turn sequence. Observer distributes game events. Command encapsulates a move. Merge keeps one accepted history entry with the snapshots used by Memento. A Decorator around the use case records operation, outcome and duration. The [class model](docs/diagrams/README.md) identifies the participants.
 
 | Principle | Design example | Acceptance check |
 | --- | --- | --- |

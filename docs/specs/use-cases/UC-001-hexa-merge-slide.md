@@ -21,7 +21,7 @@
 
 ## Alternative flows
 - **A1 (step 2):** no tile can move or merge → the slide is ignored, no tile is spawned, nothing changes.
-- **A2 (step 6):** the target tile appears → outcome `victory`, victory screen.
+- **A2 (step 6):** the target tile appears → emit `TargetReached` and show the victory screen; the player may continue if moves remain.
 - **A3 (step 6):** no direction can change the board → outcome `defeat`, defeat screen.
 
 ## Postconditions
